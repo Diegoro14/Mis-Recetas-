@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Mi Recetario 🍳</title>
+
+    <!-- === APPLE PWA META TAGS === -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Recetario">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#f59e0b">
+
+    <!-- === WEB APP MANIFEST (inline via data URI) === -->
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Mi%20Recetario%20M%C3%A1gico%22%2C%22short_name%22%3A%22Recetario%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23fffbeb%22%2C%22theme_color%22%3A%22%23f59e0b%22%2C%22orientation%22%3A%22portrait%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgo%3D%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
+
+    <!-- Apple touch icon SVG como data URI -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23f59e0b'/%3E%3Ctext x='90' y='125' font-size='90' text-anchor='middle'%3E🍳%3C/text%3E%3C/svg%3E">
+
+    <!-- CDNs (se cachean con Service Worker tras primera carga con wifi) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+    <script>
+        // Tailwind config
+        if (typeof tailwind !== "undefined") {
+            tailwind.config = {
+                darkMode: "class",
+                theme: { extend: { fontFamily: { sans: ["Outfit","sans-serif"], serif: ["Playfair Display","serif"] } } }
+            };
+        }
+    </script>
+
+    <style>
+        /* === SAFE AREA / IPHONE NOTCH === */
+        :root {
+            --sat: env(safe-area-inset-top, 0px);
+            --sab: env(safe-area-inset-bottom, 0px);
+            --sal: env(safe-area-inset-left, 0px);
+            --sar: env(safe-area-inset-right, 0px);
+        }
+        body {
+            padding-top: var(--sat);
+            padding-bottom: var(--sab);
+        }
+        /* Fix scroll bounce en iOS */
+        html, body { height: 100%; overflow: hidden; }
+        #app-root { height: 100%; overflow: hidden; }
+
+        /* Scroll nativo iOS */
+        .ios-scroll {
+            -webkit-overflow-scrolling: touch;
+            overflow-y: auto;
+        }
+
+        /* Touch targets específicos y compactos para PWA */
+        .touch-target-pwa { min-height: 44px; }
+        .category-btn { min-height: 32px !important; display: inline-flex; align-items: center; justify-content: center; }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        .recipe-gradient { background: linear-gradient(135deg, #fffcf4 0%, #fef9ec 100%); }
+        .dark .recipe-gradient { background: linear-gradient(135deg, #1e1b15 0%, #181611 100%); }
+
+        .forced-light-input {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            color-scheme: light !important;
+        }
+        .dark .forced-light-input {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+            color-scheme: dark !important;
+        }
+        .checked-ingredient {
+            text-decoration: line-through;
+            color: #94a3b8;
+            opacity: 0.6;
+        }
+
+        /* Animación del toast */
+        #toast { transition: transform 0.3s ease, opacity 0.3s ease; }
+
+        /* PWA standalone: ocultar el selector PC/Teléfono */
+        @media (display-mode: standalone) {
+            #view-mode-selector { display: none !important; }
+            #global-header { padding-top: max(12px, env(safe-area-inset-top)); }
+        }
+
+        /* Fallback font si no carga Google Fonts */
+        body { font-family: "Outfit", system-ui, -apple-system, sans-serif; }
+
+        /* Bottom bar segura en iPhone X+ */
+        #mobile-import-footer {
+            padding-bottom: max(16px, env(safe-area-inset-bottom));
+        }
+        #global-header {
+            padding-top: env(safe-area-inset-top, 0px);
+        }
+
+        /* Tap highlight off para iOS */
+        * { -webkit-tap-highlight-color: transparent; }
+
+        /* Animación de carga */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+        @keyframes bounce { 0%,100%{transform:translateY(-25%);animation-timing-function:cubic-bezier(.8,0,1,1)} 50%{transform:none;animation-timing-function:cubic-bezier(0,0,.2,1)} }
+        .animate-bounce { animation: bounce 1s infinite; }
+
+        /* === ANIMACIONES DE SATURACIÓN Y GLOW ESTILO GLITCH DUAL SOLICITADOS POR DIEGO === */
+        @keyframes glitch-glow-yt {
+            0%, 100% { filter: drop-shadow(-1.5px -1.5px 0px rgba(255,255,255,0.7)) drop-shadow(1.5px 1.5px 0px rgba(239,68,68,0.8)); }
+            50% { filter: drop-shadow(-3px -2px 3px rgba(255,255,255,0.9)) drop-shadow(3px 2px 8px rgba(239,68,68,1)); }
+        }
+        @keyframes glitch-glow-ig {
+            0%, 100% { filter: drop-shadow(-1.5px -1.5px 0px rgba(245,158,11,0.7)) drop-shadow(1.5px 1.5px 0px rgba(217,70,239,0.8)); }
+            50% { filter: drop-shadow(-3px -2px 3px rgba(245,158,11,0.9)) drop-shadow(3px 2px 8px rgba(217,70,239,1)); }
+        }
+        @keyframes glitch-glow-tt {
+            0%, 100% { filter: drop-shadow(-1.5px -1.5px 0px rgba(0,242,234,0.8)) drop-shadow(1.5px 1.5px 0px rgba(254,44,85,0.8)); }
+            50% { filter: drop-shadow(-3.5px -2.5px 3px rgba(0,242,234,1)) drop-shadow(3.5px 2.5px 6px rgba(254,44,85,1)); }
+        }
+
+        .pulse-glow-youtube { animation: glitch-glow-yt 1.4s ease-in-out infinite; }
+        .pulse-glow-instagram { animation: glitch-glow-ig 1.4s ease-in-out infinite; }
+        .pulse-glow-tiktok { animation: glitch-glow-tt 1.2s ease-in-out infinite; }
+
+        /* Botón modo oscuro móvil (iPhone) */
+        #mobileDarkModeBtn{
+            position:absolute;
+            top:max(14px, env(safe-area-inset-top));
+            right:max(14px, env(safe-area-inset-right));
+            z-index:35;
+        }
+        @media (min-width:768px){
+            #mobileDarkModeBtn{display:none!important;}
+        }
+
+        /* no-scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* === AJUSTE DE NOTCH PARA EL BOTÓN VOLVER === */
+        #mobileBackBtn {
+            top: calc(max(16px, env(safe-area-inset-top, 0px))) !important;
+            left: calc(max(16px, env(safe-area-inset-left, 0px))) !important;
+        }
+
+        /* === Ocultar textos de botones en pantallas pequeñas para evitar encajonamientos === */
+        @media (max-width: 1024px) {
+            .action-text { display: none !important; }
+        }
+        .simulated-mobile .action-text {
+            display: none !important;
+        }
+
+        /* Banner de imagen más compacto en pantallas pequeñas para ganar lectura vertical */
+        @media (max-width: 768px) {
+            .view-banner-box { height: 9rem !important; }
+        }
+        .simulated-mobile .view-banner-box { height: 9rem !important; }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 h-full select-none antialiased transition-colors duration-200">
+
+<div id="app-root" class="flex flex-col h-full">
+
+    <!-- HEADER GLOBAL -->
+    <header id="global-header" class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-2 flex items-center justify-between gap-3 z-20 shadow-sm flex-shrink-0">
+        <div class="flex items-center gap-2">
+            <div class="text-amber-500">
+                <svg class="w-7 h-7 fill-current" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M203.2 24C161.7 24 128 57.7 128 99.2c0 14.3 4 27.6 10.9 39C104.3 148.9 80 183.6 80 224c0 47.9 34.3 87.7 80 95.2V384c0 17.7 14.3 32 32 32h128c17.7 0 32-14.3 32-32v-64.8c45.7-7.5 80-47.3 80-95.2 0-40.4-24.3-75.1-58.9-85.8 6.9-11.4 10.9-24.7 10.9-39 0-41.5-33.7-75.2-75.2-75.2-19.1 0-36.5 7.1-49.8 18.8C239.7 31.1 222.3 24 203.2 24zM160 448c-17.7 0-32 14.3-32 32s14.3 32 32 32h192c17.7 0 32-14.3 32-32s-14.3-32-32-32H160z"/>
+                </svg>
+            </div>
+            <span class="font-bold text-sm text-slate-900 dark:text-slate-100">Mi Recetario</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Zoom global -->
+            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                <button onclick="changeFontSize(-1)" class="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 hover:bg-amber-500 hover:text-white flex items-center justify-center font-bold text-sm transition-all" style="min-height:32px;min-width:32px">
+                    <i class="fa-solid fa-minus text-xs"></i>
+                </button>
+                <span id="fontSizeDisplay" class="text-xs font-bold text-slate-700 dark:text-slate-300 px-1 min-w-[32px] text-center">100%</span>
+                <button onclick="changeFontSize(1)" class="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 hover:bg-amber-500 hover:text-white flex items-center justify-center font-bold text-sm transition-all" style="min-height:32px;min-width:32px">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Vista PC/Móvil (solo en desktop) -->
+            <div id="view-mode-selector" class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                <button onclick="setViewMode('pc')" id="pcViewBtn" class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all bg-white dark:bg-slate-700 text-amber-500 shadow-sm" style="min-height:32px">
+                    <i class="fa-solid fa-desktop"></i> PC
+                </button>
+                <button onclick="setViewMode('mobile')" id="mobileViewBtn" class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300" style="min-height:32px">
+                    <i class="fa-solid fa-mobile-screen-button"></i> Teléfono
+                </button>
+            </div>
+
+            <!-- Modo oscuro -->
+            <button onclick="toggleDarkMode()" class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-amber-400 transition-colors" style="min-height:40px;min-width:40px">
+                <i class="fa-solid fa-circle-half-stroke"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- WORKSPACE -->
+    <div id="workspace" class="flex-1 flex overflow-hidden bg-slate-100 dark:bg-slate-950">
+
+        <!-- APP CONTAINER (relative para contener absolutos como el FAB y los modales asíncronos) -->
+        <div id="appContainer" class="relative w-full h-full flex flex-col md:flex-row bg-white dark:bg-slate-900 overflow-hidden">
+
+            <!-- SIDEBAR (Agrandada a md:w-[380px] para evitar que se corten los textos) -->
+            <aside id="appSidebar" class="w-full md:w-[380px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col h-full flex-shrink-0 overflow-hidden">
+
+                <!-- App header -->
+                <div class="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between recipe-gradient flex-shrink-0">
+                    <div class="flex items-center gap-2">
+                        <div class="bg-amber-500 text-white w-9 h-9 rounded-xl flex items-center justify-center shadow-md">
+                            <i class="fa-solid fa-utensils"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-bold text-sm text-slate-900 dark:text-slate-100">Mi Recetario</h1>
+                            <p class="text-[10px] text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wide">Solo para Diego</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-1">
+                        <button onclick="openConfigModal()" class="text-slate-500 dark:text-slate-400 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" style="min-height:40px;min-width:40px">
+                            <i class="fa-solid fa-gear"></i>
+                        </button>
+                        <button onclick="openBackupModal()" class="text-slate-500 dark:text-slate-400 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" style="min-height:40px;min-width:40px">
+                            <i class="fa-solid fa-database"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Nueva receta -->
+                <div class="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+                    <button onclick="openManualRecipeModal()" class="w-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white py-2.5 px-4 rounded-xl font-bold flex items-center justify-center gap-2 text-xs transition-all shadow-sm touch-target-pwa">
+                        <i class="fa-solid fa-circle-plus"></i> Nueva Receta Manual
+                    </button>
+                </div>
+
+                <!-- Buscador -->
+                <div class="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex-shrink-0">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-slate-400 text-sm"></i>
+                        <input type="search" id="searchBar" oninput="filterRecipes()" placeholder="Buscar receta o ingrediente..."
+                            class="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all forced-light-input" style="min-height:44px">
+                    </div>
+                    <!-- Filtros auto-ajustables con flex-wrap para que se vean todos completos y ordenados en PC y móvil -->
+                    <div class="flex flex-wrap gap-1.5 mt-2 pb-1 items-center">
+                        <button onclick="setCategoryFilter('Todos')" class="category-btn active px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap bg-amber-500 text-white transition-all">Todos</button>
+                        <button onclick="setCategoryFilter('Desayuno')" class="category-btn px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all">Desayuno</button>
+                        <button onclick="setCategoryFilter('Almuerzo')" class="category-btn px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all">Almuerzo</button>
+                        <button onclick="setCategoryFilter('Postre')" class="category-btn px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all">Postre</button>
+                        <button onclick="setCategoryFilter('Trago')" class="category-btn px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all">Tragos</button>
+                        <button onclick="setCategoryFilter('Favoritos')" class="category-btn px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all flex items-center gap-1">
+                            <i class="fa-regular fa-bookmark text-slate-400"></i> Favoritos
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lista de recetas -->
+                <div class="flex-1 ios-scroll p-3 space-y-2" id="recipeListContainer"></div>
+
+                <!-- Footer importar IA (PC) -->
+                <div id="pcImportFooter" class="p-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
+                    <button onclick="openImportModal()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-xs touch-target-pwa">
+                        <i class="fa-solid fa-wand-magic-sparkles animate-pulse"></i>
+                        Importador Inteligente IA
+                    </button>
+                </div>
+            </aside>
+
+            <!-- VISOR DE RECETA -->
+            <main id="appViewer" class="flex-1 bg-slate-50 dark:bg-slate-900/60 flex-col h-full overflow-hidden hidden md:flex relative">
+
+                <!-- Estado vacío -->
+                <div class="flex flex-col items-center justify-center h-full p-8" id="emptyStateViewer">
+                    <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 text-center max-w-xs">
+                        <i class="fa-solid fa-kitchen-set text-5xl text-amber-500 mb-4 animate-bounce block"></i>
+                        <h3 class="text-base font-bold text-slate-800 dark:text-slate-200 mb-1">¡Listo para cocinar, Diego!</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Selecciona una receta, créala manualmente o impórtala con IA.</p>
+                    </div>
+                </div>
+
+                <!-- Contenido receta activa -->
+                <div class="hidden h-full flex-col" id="activeRecipeContent">
+
+                    <!-- Banner -->
+                    <div class="w-full h-40 md:h-52 overflow-hidden relative bg-slate-100 dark:bg-slate-800 flex-shrink-0 view-banner-box">
+                        <img id="viewRecipeBanner" src="" class="w-full h-full object-cover" alt="Banner">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+
+                        <!-- Botón volver (solo móvil / simulado) con ajuste de notch en CSS -->
+                        <button id="mobileBackBtn" onclick="updateMobileView('list')" class="absolute bg-slate-900/80 text-white px-4 py-2.5 rounded-xl text-xs font-bold backdrop-blur-sm flex items-center gap-1.5 shadow-md z-40 hidden" style="min-height:44px">
+                            <i class="fa-solid fa-arrow-left"></i> Volver
+                        </button>
+
+                        <div class="absolute bottom-3 left-5">
+                            <span id="viewRecipeCategory" class="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-semibold uppercase tracking-wider rounded-md">Cat</span>
+                        </div>
+                    </div>
+
+                    <!-- Info y acciones (CON NUEVO LAYOUT DE TEXTOS DE COLORES SELECCIONADO POR DIEGO) -->
+                    <div class="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
+                        <div class="flex flex-col md:flex-row justify-between gap-3">
+                            <div class="space-y-1.5">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 font-semibold">
+                                        <i class="fa-regular fa-clock"></i> <span id="viewRecipeTime">-- mins</span>
+                                    </span>
+                                </div>
+                                <h2 id="viewRecipeTitle" class="font-serif text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight"></h2>
+                            </div>
+
+                            <!-- Acciones con textos responsivos de color plano (Sin layout de botones toscos) -->
+                            <div class="flex items-center gap-4 flex-wrap text-sm font-bold">
+                                <!-- Botón Favorito / Guardar estilo Bookmark de Instagram/TikTok -->
+                                <button onclick="toggleFavoriteActive()" id="favBtn" class="flex items-center gap-1.5 transition-colors focus:outline-none py-1">
+                                    <i id="favBtnIcon" class="fa-regular fa-bookmark text-base"></i>
+                                    <span id="favBtnText" class="action-text">Agregar a Favorito</span>
+                                </button>
+
+                                <!-- Botón Copiar (Texto e icono en gris) -->
+                                <button onclick="copyRecipeToClipboard()" class="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 hover:text-slate-600 dark:hover:text-slate-300 py-1">
+                                    <i class="fa-solid fa-copy text-base"></i>
+                                    <span class="action-text">Copiar</span>
+                                </button>
+
+                                <!-- Botón Enviar a WhatsApp (Texto e icono en verde) -->
+                                <button onclick="sendRecipeToWhatsApp()" class="text-emerald-500 hover:text-emerald-600 flex items-center gap-1.5 py-1">
+                                    <i class="fa-brands fa-whatsapp text-lg"></i>
+                                    <span class="action-text">Enviar a WhatsApp</span>
+                                </button>
+
+                                <!-- Botón Exportar PDF (Texto e icono en rojo) -->
+                                <button onclick="downloadRecipePDF()" class="text-red-600 hover:text-red-700 flex items-center gap-1.5 py-1">
+                                    <i class="fa-solid fa-file-pdf text-base"></i>
+                                    <span class="action-text">Exportar PDF</span>
+                                </button>
+
+                                <!-- Botón Exportar Word (Texto e icono en azul) -->
+                                <button onclick="downloadRecipeWord()" class="text-blue-600 hover:text-blue-700 flex items-center gap-1.5 py-1">
+                                    <i class="fa-solid fa-file-word text-base"></i>
+                                    <span class="action-text">Exportar Word</span>
+                                </button>
+
+                                <!-- Botón Editar Receta (Texto en Naranja de la app) -->
+                                <button onclick="editCurrentRecipe()" class="text-amber-500 hover:text-amber-600 flex items-center gap-1.5 py-1">
+                                    <i class="fa-solid fa-pen-to-square text-base"></i>
+                                    <span class="action-text">Editar Receta</span>
+                                </button>
+
+                                <!-- Botón Eliminar Receta (Basurero rojo tal cual estaba, adaptando el color del texto de forma dinámica según tema en JS) -->
+                                <button onclick="confirmDeleteCurrentRecipe()" id="deleteRecipeBtn" class="flex items-center gap-1.5 py-1">
+                                    <i class="fa-solid fa-trash-can text-base"></i>
+                                    <span class="action-text">Eliminar Receta</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ingredientes y pasos -->
+                    <div class="flex-1 ios-scroll p-4 md:p-6 space-y-5">
+
+                        <!-- NUEVO CONTENEDOR DEL BOTÓN DE VIDEO ORIGINAL (Sencillo, limpio, tipografía legible y sin caja vino tinto) -->
+                        <div id="videoActionBlock" class="hidden bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 p-5 rounded-2xl items-center justify-between gap-4 flex-wrap">
+                            <div class="space-y-1.5 flex-1 min-w-[280px]">
+                                <p class="text-sm md:text-base font-bold text-slate-900 dark:text-slate-100">¿Quieres ver la preparación paso a paso?</p>
+                                <p id="videoInstructionsSubtext" class="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium">Si quieres ver la receta original haz click en el botón.</p>
+                            </div>
+                            <!-- Botón con glow inteligente sólo en el icono de reproducción -->
+                            <a id="viewSourceLinkBtn" href="#" target="_blank" class="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold py-2.5 px-5 rounded-xl text-xs flex items-center gap-2.5 transition-all shadow-md">
+                                <span id="viewSourceIcon" class="flex items-center justify-center">
+                                    <i class="fa-solid fa-play text-xs"></i>
+                                </span>
+                                <span id="viewSourceText">Ver Video</span>
+                            </a>
+                        </div>
+
+                        <!-- Ingredientes -->
+                        <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-700/80">
+                            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
+                                <h3 class="font-serif text-lg font-bold text-slate-900 dark:text-slate-100">Ingredientes</h3>
+                                <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 p-0.5 rounded-lg">
+                                    <button onclick="changeSectionFontSize('ingredients',-1)" class="w-6 h-6 rounded bg-white dark:bg-slate-600 hover:bg-amber-500 hover:text-white flex items-center justify-center font-bold text-xs" style="min-height:24px;min-width:24px">-</button>
+                                    <span id="ingredientsScaleDisplay" class="text-[10px] font-bold text-slate-600 dark:text-slate-300 px-1 min-w-[28px] text-center">100%</span>
+                                    <button onclick="changeSectionFontSize('ingredients',1)" class="w-6 h-6 rounded bg-white dark:bg-slate-600 hover:bg-amber-500 hover:text-white flex items-center justify-center font-bold text-xs" style="min-height:24px;min-width:24px">+</button>
+                                </div>
+                            </div>
+                            <ul class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-base font-semibold" id="viewRecipeIngredients"></ul>
+                        </div>
+
+                        <!-- Preparación -->
+                        <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-700/80">
+                            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
+                                <h3 class="font-serif text-lg font-bold text-slate-900 dark:text-slate-100">Preparación</h3>
+                                <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 p-0.5 rounded-lg">
+                                    <button onclick="changeSectionFontSize('instructions',-1)" class="w-6 h-6 rounded bg-white dark:bg-slate-600 hover:bg-amber-500 hover:text-white flex items-center justify-center font-bold text-xs" style="min-height:24px;min-width:24px">-</button>
+                                    <span id="instructionsScaleDisplay" class="text-[10px] font-bold text-slate-600 dark:text-slate-300 px-1 min-w-[28px] text-center">100%</span>
+                                    <button onclick="changeSectionFontSize('instructions',1)" class="w-6 h-6 rounded bg-white dark:bg-slate-600 hover:bg-amber-500 hover:text-white flex items-center justify-center font-bold text-xs" style="min-height:24px;min-width:24px">+</button>
+                                </div>
+                            </div>
+                            <ol class="space-y-4 text-base font-medium" id="viewRecipeInstructions"></ol>
+                        </div>
+
+                        <!-- Espacio extra para el footer móvil -->
+                        <div class="h-20 md:h-0"></div>
+                    </div>
+                </div>
+
+                <!-- Footer importar IA (móvil) -->
+                <div id="mobileImportFooter" class="absolute bottom-0 left-0 right-0 p-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl md:hidden z-10" style="padding-bottom: max(12px, env(safe-area-inset-bottom))">
+                    <button onclick="openImportModal()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs touch-target-pwa">
+                        <i class="fa-solid fa-wand-magic-sparkles animate-pulse"></i>
+                        Importador Inteligente IA
+                    </button>
+                </div>
+            </main>
+
+            
+            <!-- Botón modo oscuro móvil -->
+            <button id="mobileDarkModeBtn" onclick="toggleDarkMode()" class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 shadow-lg flex items-center justify-center text-slate-600 dark:text-amber-400 transition-colors md:hidden">
+                <i class="fa-solid fa-circle-half-stroke"></i>
+            </button>
+
+            <!-- FAB móvil -->
+            <button id="mobileAddRecipeBtn" onclick="openManualRecipeModal()" class="absolute bg-amber-500 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg z-30 transition-all hidden animate-bounce" style="bottom: max(88px, calc(72px + env(safe-area-inset-bottom))); right: 16px">
+                <i class="fa-solid fa-plus text-xl"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MODALES (posicionados en 'absolute' para quedar dentro del canvas del depto simulado) ===== -->
+
+<!-- IMPORTADOR IA -->
+<div id="importModal" class="hidden absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-lg flex flex-col max-h-[90%] overflow-hidden" style="padding-bottom: env(safe-area-inset-bottom)">
+        <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between recipe-gradient flex-shrink-0">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+                <h3 class="font-bold text-sm">Importador Inteligente IA</h3>
+            </div>
+            <button onclick="closeImportModal()" class="text-slate-400 p-2" style="min-height:40px;min-width:40px"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="p-4 space-y-3 ios-scroll flex-1">
+            <div class="p-3 bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/50 rounded-xl">
+                <p class="text-[10px] text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
+                    <i class="fa-solid fa-circle-info mr-1"></i> Pega el enlace del video y Gemini extraerá la receta automáticamente.
+                </p>
+            </div>
+            <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase">Enlace (YouTube o Instagram):</label>
+                <input type="url" id="importLinkInput" placeholder="https://www.youtube.com/watch?v=..."
+                    class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 forced-light-input" style="min-height:44px">
+            </div>
+            <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase">Imagen (Opcional):</label>
+                <input type="url" id="importImageUrlInput" placeholder="https://ejemplo.com/foto.jpg"
+                    class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 forced-light-input" style="min-height:44px">
+            </div>
+            <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase">Texto de la receta (Opcional):</label>
+                <textarea id="importDescriptionInput" placeholder="Pega la descripción de ingredientes aquí..." rows="4"
+                    class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 forced-light-input"></textarea>
+            </div>
+            <button onclick="processPastedDescriptionWithAI()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 text-sm" style="min-height:48px">
+                <i class="fa-solid fa-brain"></i> Analizar con IA
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- CONFIGURACIÓN -->
+<div id="configModal" class="hidden absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-md flex flex-col max-h-[90%] overflow-hidden" style="padding-bottom:env(safe-area-inset-bottom)">
+        <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between recipe-gradient flex-shrink-0">
+            <div class="flex items-center gap-2"><i class="fa-solid fa-gear text-amber-500"></i><h3 class="font-bold text-sm">Ajustes</h3></div>
+            <button onclick="closeConfigModal()" class="text-slate-400 p-2" style="min-height:40px;min-width:40px"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="p-4 space-y-4 ios-scroll flex-1">
+            <div class="space-y-2">
+                <h4 class="font-bold text-[10px] text-slate-800 dark:text-slate-200 uppercase border-b border-slate-100 dark:border-slate-800 pb-1">Clave API de Gemini</h4>
+                <p class="text-[10px] text-slate-500">Opcional. Sin ella se usa el motor local offline.</p>
+                <div class="flex gap-2">
+                    <input type="password" id="userApiKeyInput" placeholder="AIzaSy..."
+                        class="flex-1 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500 forced-light-input" style="min-height:44px">
+                    <button onclick="testAndSaveApiKey()" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 rounded-xl text-xs" style="min-height:44px">Probar</button>
+                </div>
+                <div id="apiTestResult" class="hidden text-[10px] p-2.5 rounded-lg"></div>
+            </div>
+            <div class="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <h4 class="font-bold text-[10px] text-slate-800 dark:text-slate-200 uppercase pb-1">Sincronización ☁️</h4>
+                <input type="text" id="syncCodeInput" placeholder="Clave secreta (ej: diego2026)"
+                    class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500 forced-light-input uppercase" style="min-height:44px">
+                <div class="flex gap-2">
+                    <button onclick="triggerCloudPush()" class="flex-1 bg-slate-900 text-white py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5" style="min-height:44px">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Subir
+                    </button>
+                    <button onclick="triggerCloudPull()" class="flex-1 bg-amber-500 text-white py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5" style="min-height:44px">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> Bajar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CREAR/EDITAR RECETA -->
+<div id="recipeModal" class="hidden absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-2xl flex flex-col max-h-[95%] overflow-hidden" style="padding-bottom:env(safe-area-inset-bottom)">
+        <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between recipe-gradient flex-shrink-0">
+            <h3 id="recipeModalTitle" class="font-bold text-sm">Crear Receta</h3>
+            <button onclick="closeRecipeModal()" class="text-slate-400 p-2" style="min-height:40px;min-width:40px"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="p-4 space-y-3 ios-scroll flex-1">
+            <input type="hidden" id="editRecipeId">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Nombre *</label>
+                    <input type="text" id="formTitle" required placeholder="Ej: Pancakes de Avena 🥞"
+                        class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none forced-light-input" style="min-height:44px">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Categoría</label>
+                        <select id="formCategory" class="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none" style="min-height:44px">
+                            <option value="Desayuno">Desayuno</option>
+                            <option value="Almuerzo">Almuerzo</option>
+                            <option value="Postre">Postre</option>
+                            <option value="Trago">Trago</option>
+                            <option value="Otros">Otros</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Tiempo (min)</label>
+                        <input type="text" id="formTime" placeholder="30"
+                            class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none forced-light-input" style="min-height:44px">
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Enlace Video (YouTube/Instagram)</label>
+                    <input type="url" id="formInstagramUrl" placeholder="https://..."
+                        class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none forced-light-input" style="min-height:44px">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Imagen (URL)</label>
+                    <input type="url" id="formImageUrl" placeholder="https://..."
+                        class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none forced-light-input" style="min-height:44px">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Ingredientes (uno por línea)</label>
+                <textarea id="formIngredients" placeholder="2 tazas (180g) de avena&#10;2 huevos&#10;1 plátano" rows="5"
+                    class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none font-mono forced-light-input"></textarea>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Preparación (un paso por línea)</label>
+                <textarea id="formInstructions" placeholder="Mezclar todos los ingredientes.&#10;Calentar la sartén..." rows="5"
+                    class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none font-mono forced-light-input"></textarea>
+            </div>
+            <button onclick="saveRecipe(event)" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-xl text-sm" style="min-height:48px">
+                Guardar Receta 📖
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- CARGA IA -->
+<div id="loadingModal" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
+    <div class="text-center space-y-4">
+        <div class="relative w-20 h-20 mx-auto">
+            <div class="absolute inset-0 border-4 border-amber-500/20 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-t-amber-500 rounded-full animate-spin"></div>
+            <div class="absolute inset-0 flex items-center justify-center text-amber-500 text-2xl">
+                <i class="fa-solid fa-hat-chef animate-pulse"></i>
+            </div>
+        </div>
+        <h3 class="text-white font-bold text-base">Procesando con IA...</h3>
+        <p id="loadingProgressText" class="text-slate-400 text-xs max-w-xs">Analizando y estructurando la receta...</p>
+    </div>
+</div>
+
+<!-- BACKUP -->
+<div id="backupModal" class="hidden absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-md flex flex-col max-h-[90%] overflow-hidden" style="padding-bottom:env(safe-area-inset-bottom)">
+        <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between recipe-gradient flex-shrink-0">
+            <div class="flex items-center gap-2"><i class="fa-solid fa-database text-amber-500"></i><h3 class="font-bold text-sm">Copia de Seguridad</h3></div>
+            <button onclick="closeBackupModal()" class="text-slate-400 p-2" style="min-height:40px;min-width:40px"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="p-4 space-y-3 ios-scroll flex-1">
+            <button onclick="downloadBackup()" class="w-full flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl" style="min-height:60px">
+                <div class="bg-emerald-100 text-emerald-700 w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-download"></i>
+                </div>
+                <div class="text-left">
+                    <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200">Exportar Recetario</h4>
+                    <p class="text-[10px] text-slate-500">Descarga un JSON con todo tu libro.</p>
+                </div>
+            </button>
+            <label class="w-full flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl cursor-pointer" style="min-height:60px">
+                <input type="file" id="backupUploadInput" accept=".json" class="hidden" onchange="importBackup(event)">
+                <div class="bg-blue-100 text-blue-700 w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-upload"></i>
+                </div>
+                <div class="text-left">
+                    <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200">Restaurar</h4>
+                    <p class="text-[10px] text-slate-500">Sube tu archivo JSON.</p>
+                </div>
+            </label>
+            <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-[11px] text-amber-900 dark:text-amber-300 space-y-2">
+                <h4 class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-info"></i> Instalar como App en iPhone</h4>
+                <p>1. Abre este archivo desde <strong>Safari</strong> en tu iPhone.</p>
+                <p>2. Toca el botón compartir <strong>⬆</strong> de Safari.</p>
+                <p>3. Selecciona <strong>"Agregar a pantalla de inicio"</strong>.</p>
+                <p>4. ¡Funciona como app nativa en modo pantalla completa! 🎉</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CONFIRMAR BORRADO -->
+<div id="deleteConfirmModal" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-sm w-full border border-red-100 dark:border-red-950/30">
+        <div class="p-5 border-b border-red-50 flex items-center gap-3 text-red-600">
+            <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+            <h3 class="font-bold text-base">¿Eliminar esta receta?</h3>
+        </div>
+        <div class="p-5 space-y-4">
+            <p class="text-xs text-slate-500">Esta acción es irreversible, Diego. ¿Seguro?</p>
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeDeleteConfirmModal()" class="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold" style="min-height:44px">Cancelar</button>
+                <button id="confirmDeleteBtn" class="px-4 py-2.5 bg-red-600 text-white rounded-xl text-xs font-semibold" style="min-height:44px">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST (posicionado absoluto con respecto al appContainer) -->
+<div id="toast" class="absolute z-50 transform translate-y-20 opacity-0 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2.5 text-xs font-semibold pointer-events-none" style="bottom: max(24px, env(safe-area-inset-bottom)); right: 16px; left: 16px; max-width: 360px; margin: 0 auto">
+    <span id="toastIcon"><i class="fa-solid fa-circle-check text-emerald-400"></i></span>
+    <span id="toastMessage">¡Listo!</span>
+</div>
+
+<!-- ===== SERVICE WORKER REGISTRATION ===== -->
+<script>
+if ('serviceWorker' in navigator) {
+    // Inline service worker via blob URL
+    const swCode = `
+const CACHE = 'recetario-v2';
+const ASSETS = [
+    'https://cdn.tailwindcss.com',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
+    'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap'
+];
+
+self.addEventListener('install', e => {
+    e.waitUntil(
+        caches.open(CACHE).then(cache => {
+            return Promise.allSettled(ASSETS.map(url => cache.add(url).catch(() => null)));
+        }).then(() => self.skipWaiting())
+    );
+});
+
+self.addEventListener('activate', e => {
+    e.waitUntil(
+        caches.keys().then(keys =>
+            Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+        ).then(() => self.clients.claim())
+    );
+});
+
+self.addEventListener('fetch', e => {
+    if (e.request.method !== 'GET') return;
+    e.respondWith(
+        caches.match(e.request).then(cached => {
+            if (cached) return cached;
+            return fetch(e.request).then(resp => {
+                if (resp && resp.status === 200) {
+                    const clone = resp.clone();
+                    caches.open(CACHE).then(c => c.put(e.request, clone));
+                }
+                return resp;
+            }).catch(() => cached);
+        })
+    );
+});
+`;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl, { scope: './' })
+        .then(() => console.log('✅ Service Worker registrado - App disponible offline'))
+        .catch(e => console.log('SW no disponible:', e));
+}
+</script>
+
+<!-- ===== JAVASCRIPT PRINCIPAL ===== -->
+<script>
+    // === ESTADO GLOBAL ===
+    let recipes = [];
+    let activeRecipeId = null;
+    let selectedCategoryFilter = 'Todos';
+    let currentView = 'list';
+    let currentScale = 100;
+    let ingredientsScale = 100;
+    let instructionsScale = 100;
+    let simulatedMobileMode = false; // Variable para simular celular en PC de manera interactiva
+    
+    // Variables para las instancias de Firebase (se inician dinámicamente)
+    let db = null;
+    let auth = null;
+    let syncUnsubscribe = null;
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'recetario-diego-2026';
+
+    // === UTILIDADES ===
+    function fetchWithTimeout(url, opts = {}, ms = 8000) {
+        const ctrl = new AbortController();
+        const id = setTimeout(() => ctrl.abort(), ms);
+        return fetch(url, { ...opts, signal: ctrl.signal })
+            .then(r => { clearTimeout(id); return r; })
+            .catch(e => { clearTimeout(id); throw e; });
+    }
+
+    // Extracción segura del ID de Youtube
+    function getYouTubeId(url) {
+        if (!url) return null;
+        const m = url.match(/(?:youtu\.be\/|v\/|watch\?v=|&v=)([^#&?]{11})/);
+        return m ? m[1] : null;
+    }
+
+    // Toast personalizado sin alert()
+    function showToast(msg, type = 'success') {
+        const toast = document.getElementById('toast');
+        document.getElementById('toastIcon').innerHTML = type === 'success'
+            ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>'
+            : '<i class="fa-solid fa-circle-xmark text-red-400"></i>';
+        document.getElementById('toastMessage').innerText = msg;
+        toast.style.transform = 'translateY(0)';
+        toast.style.opacity = '1';
+        setTimeout(() => {
+            toast.style.transform = 'translateY(80px)';
+            toast.style.opacity = '0';
+        }, 3500);
+    }
+
+    // === STORAGE ===
+    function saveToLocalStorage() {
+        localStorage.setItem('diego_recetario_privado_2026', JSON.stringify(recipes));
+    }
+
+    async function saveRecipeToCloud(recipe) {
+        if (!db || !auth?.currentUser) return;
+        try {
+            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'recipes', recipe.id), recipe);
+        } catch(e) { console.error('Firebase save error:', e); }
+    }
+
+    async function deleteRecipeFromCloud(id) {
+        if (!db || !auth?.currentUser) return;
+        try {
+            const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'recipes', id));
+        } catch(e) { console.error('Firebase delete error:', e); }
+    }
+
+    // === INIT ===
+    window.onload = async function() {
+        // Tema oscuro
+        const theme = localStorage.getItem('theme');
+        if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+
+        // Escala
+        const savedScale = localStorage.getItem('fontScale');
+        if (savedScale) { currentScale = parseInt(savedScale); applyFontScale(); }
+
+        // Cargar recetas
+        const local = localStorage.getItem('diego_recetario_privado_2026');
+        recipes = local ? JSON.parse(local) : getDefaultRecipes();
+        if (!local) saveToLocalStorage();
+
+        renderRecipeList();
+        if (recipes.length > 0) selectRecipe(recipes[0].id, false);
+
+        // Inicializar Firebase asíncronamente
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+                const { getAuth, signInAnonymously, signInWithCustomToken } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                const { getFirestore } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+                const app = initializeApp(JSON.parse(__firebase_config));
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                setupRealtimeSync();
+            } catch(e) { console.error('Firebase init error:', e); }
+        }
+
+        // Event listener de resize optimizado
+        window.addEventListener('resize', () => updateMobileView(currentView));
+        updateMobileView(currentView);
+
+        // En PWA standalone, ocultar el selector de vista
+        if (window.navigator.standalone) {
+            document.getElementById('view-mode-selector')?.classList.add('hidden');
+        }
+    };
+
+    function getDefaultRecipes() {
+        return [
+            {
+                id: 'demo-1', title: 'Pancakes de Avena Saludables 🥞', category: 'Desayuno', time: '15',
+                instagramUrl: '', imageUrl: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?q=80&w=600&auto=format&fit=crop',
+                ingredients: '2 tazas (180g) de avena en hojuelas\n2 huevos enteros\n1 taza (240ml) de leche\n1 plátano maduro\n1 cdta (5g) de canela\n1 cdta (5ml) de vainilla',
+                instructions: 'Licuar todos los ingredientes hasta obtener mezcla homogénea.\nCalentar sartén antiadherente a fuego medio.\nVerter porciones y cocinar hasta que salgan burbujas.\nDar vuelta y dorar el otro lado.\nServir con fruta o miel.',
+                favorite: true, checkedIngredients: {}
+            },
+            {
+                id: 'demo-2', title: 'Mug Cake de Chocolate ☕🍫', category: 'Postre', time: '5',
+                instagramUrl: '', imageUrl: 'https://images.unsplash.com/photo-1586040140378-b5634cb4c8fc?q=80&w=600&auto=format&fit=crop',
+                ingredients: '4 cdas (30g) de harina\n2 cdas (15g) de azúcar\n1 cda (8g) de cacao amargo\n1/4 cdta (2g) de polvo de hornear\n3 cdas (45ml) de leche\n1 cda (15ml) de aceite de coco\n1 cda (15g) de chips de chocolate',
+                instructions: 'Mezclar ingredientes secos en una taza apta para microondas.\nAgregar leche and aceite, mezclar con tenedor.\nPoner chips de chocolate encima.\nMicroondas a máxima potencia 1 min 20 seg.',
+                favorite: false, checkedIngredients: {}
+            }
+        ];
+    }
+
+    // === FIREBASE SYNC ===
+    async function setupRealtimeSync() {
+        if (!db || !auth.currentUser) return;
+        try {
+            const { collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            const ref = collection(db, 'artifacts', appId, 'public', 'data', 'recipes');
+            
+            if (syncUnsubscribe) syncUnsubscribe();
+            syncUnsubscribe = onSnapshot(ref, snap => {
+                const remote = [];
+                snap.forEach(d => remote.push({ id: d.id, ...d.data() }));
+                if (remote.length > 0) {
+                    recipes = remote;
+                    saveToLocalStorage();
+                    renderRecipeList();
+                    if (activeRecipeId && recipes.some(r => r.id === activeRecipeId)) {
+                        selectRecipe(activeRecipeId, false);
+                    } else if (recipes.length > 0) {
+                        selectRecipe(recipes[0].id, false);
+                    }
+                }
+            }, e => console.error('Sync error:', e));
+        } catch(e) { console.error('Sync initialization error:', e); }
+    }
+
+    // === RENDER ===
+    function renderRecipeList() {
+        const container = document.getElementById('recipeListContainer');
+        if (!container) return;
+        container.innerHTML = '';
+        const search = document.getElementById('searchBar').value.toLowerCase();
+
+        const filtered = recipes.filter(r => {
+            const matchSearch = r.title.toLowerCase().includes(search) || (r.ingredients && r.ingredients.toLowerCase().includes(search));
+            const matchCat = selectedCategoryFilter === 'Todos' ? true
+                : selectedCategoryFilter === 'Favoritos' ? r.favorite
+                : r.category === selectedCategoryFilter;
+            return matchSearch && matchCat;
+        });
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="text-center py-12 text-slate-400"><i class="fa-solid fa-magnifying-glass text-3xl mb-3 text-slate-300 block"></i><p class="text-xs">No se encontraron recetas.</p></div>';
+            return;
+        }
+
+        const catEmoji = { Desayuno: '🥞', Almuerzo: '🍖', Postre: '🍰', Trago: '🍹', Otros: '🍳' };
+        const catColor = {
+            Desayuno: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40',
+            Almuerzo: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40',
+            Postre: 'bg-pink-100 text-pink-700 dark:bg-pink-950/40',
+            Trago: 'bg-purple-100 text-purple-700 dark:bg-purple-950/40',
+            Otros: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40'
+        };
+
+        filtered.forEach(recipe => {
+            const isActive = recipe.id === activeRecipeId;
+            const emoji = catEmoji[recipe.category] || '🍳';
+            const color = catColor[recipe.category] || catColor.Otros;
+            
+            // Icono de guardado naranja activo o gris inactivo
+            const isFav = recipe.favorite ? 'text-amber-500' : 'text-slate-300 dark:text-slate-600';
+            const favIconClass = recipe.favorite ? 'fa-solid fa-bookmark' : 'fa-regular fa-bookmark';
+
+            let thumb = '';
+            if (recipe.imageUrl?.trim()) {
+                thumb = recipe.imageUrl;
+            } else {
+                const ytId = getYouTubeId(recipe.instagramUrl);
+                if (ytId) {
+                    thumb = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`;
+                } else {
+                    // Fallback estético de imagen según categoría para Instagram y TikTok
+                    if (recipe.category === 'Desayuno') thumb = 'https://images.unsplash.com/photo-1525351484163-7529414344d8?q=80&w=150&auto=format&fit=crop';
+                    else if (recipe.category === 'Almuerzo') thumb = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=150&auto=format&fit=crop';
+                    else if (recipe.category === 'Postre') thumb = 'https://images.unsplash.com/photo-1551024601-bec78aea704b?q=80&w=150&auto=format&fit=crop';
+                    else if (recipe.category === 'Trago') thumb = 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?q=80&w=150&auto=format&fit=crop';
+                    else thumb = 'https://images.unsplash.com/photo-1495521821757-a1efb6729352?q=80&w=150&auto=format&fit=crop';
+                }
+            }
+
+            const thumbHTML = thumb
+                ? `<div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100"><img src="${thumb}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\'w-full h-full flex items-center justify-center text-xl ${color}\'>${emoji}</div>'"></div>`
+                : `<div class="w-14 h-14 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl ${color}">${emoji}</div>`;
+
+            const card = document.createElement('div');
+            card.className = `p-3 rounded-xl cursor-pointer border transition-all relative ${isActive ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`;
+            card.onclick = () => selectRecipe(recipe.id, true);
+            card.innerHTML = `
+                <div class="flex items-center gap-3">
+                    ${thumbHTML}
+                    <div class="flex-1 min-w-0 pr-7 space-y-0.5">
+                        <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase rounded">${recipe.category || 'Otros'}</span>
+                        <h4 class="font-bold text-slate-900 dark:text-slate-100 text-xs leading-snug truncate">${recipe.title}</h4>
+                        <p class="text-[9px] text-slate-500 flex items-center gap-1"><i class="fa-regular fa-clock"></i> ${recipe.time || '--'} mins</p>
+                    </div>
+                    <button onclick="toggleFavoriteInline(event,'${recipe.id}')" class="${isFav} absolute top-3 right-3 hover:scale-110 transition-transform p-1" style="min-height:32px;min-width:32px">
+                        <i class="${favIconClass} text-xs"></i>
+                    </button>
+                </div>`;
+            container.appendChild(card);
+        });
+    }
+
+    // === SELECCIONAR RECETA ===
+    function selectRecipe(id, triggerNav = true) {
+        activeRecipeId = id;
+        renderRecipeList();
+        const recipe = recipes.find(r => r.id === id);
+        if (!recipe) return;
+        if (triggerNav) updateMobileView('recipe');
+
+        document.getElementById('emptyStateViewer').classList.add('hidden');
+        const content = document.getElementById('activeRecipeContent');
+        content.classList.remove('hidden');
+        content.classList.add('flex');
+
+        // Banner
+        let banner = 'https://images.unsplash.com/photo-1495521821757-a1efb6729352?q=80&w=800&auto=format&fit=crop';
+        if (recipe.imageUrl?.trim()) {
+            banner = recipe.imageUrl;
+        } else {
+            const ytId = getYouTubeId(recipe.instagramUrl);
+            if (ytId) {
+                banner = `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`;
+            } else {
+                // Fallbacks según categoría si no tiene imagen asignada
+                if (recipe.category === 'Desayuno') banner = 'https://images.unsplash.com/photo-1525351484163-7529414344d8?q=80&w=800&auto=format&fit=crop';
+                else if (recipe.category === 'Almuerzo') banner = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=800&auto=format&fit=crop';
+                else if (recipe.category === 'Postre') banner = 'https://images.unsplash.com/photo-1551024601-bec78aea704b?q=80&w=800&auto=format&fit=crop';
+                else if (recipe.category === 'Trago') banner = 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?q=80&w=800&auto=format&fit=crop';
+            }
+        }
+
+        const bannerImg = document.getElementById('viewRecipeBanner');
+        bannerImg.src = banner;
+        bannerImg.onerror = () => bannerImg.src = 'https://images.unsplash.com/photo-1495521821757-a1efb6729352?q=80&w=800&auto=format&fit=crop';
+
+        document.getElementById('viewRecipeTitle').innerText = recipe.title;
+        document.getElementById('viewRecipeCategory').innerText = recipe.category || 'Otros';
+        document.getElementById('viewRecipeTime').innerText = (recipe.time || '--') + ' mins';
+
+        // --- SECCIÓN DE VIDEO FUENTE (Con el botón de reproducción con glow glitch dual por red) ---
+        const videoActionBlock = document.getElementById('videoActionBlock');
+        const viewSourceLinkBtn = document.getElementById('viewSourceLinkBtn');
+        const viewSourceText = document.getElementById('viewSourceText');
+        const viewSourceIcon = document.getElementById('viewSourceIcon');
+
+        if (recipe.instagramUrl?.trim()) {
+            viewSourceLinkBtn.href = recipe.instagramUrl;
+            videoActionBlock.classList.remove('hidden');
+            videoActionBlock.classList.add('flex');
+            
+            const isIG = recipe.instagramUrl.includes('instagram.com');
+            const isTikTok = recipe.instagramUrl.includes('tiktok.com');
+
+            if (isIG) {
+                viewSourceText.innerText = 'Ver Reel';
+                viewSourceIcon.innerHTML = '<i class="fa-brands fa-instagram text-sm"></i>';
+                // Estilo glitch de Instagram (naranja/magenta institucional) aplicando la animación sólo al icono
+                viewSourceLinkBtn.className = "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-2.5 px-5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md";
+                viewSourceIcon.className = "flex items-center justify-center pulse-glow-instagram";
+            } else if (isTikTok) {
+                viewSourceText.innerText = 'Ver TikTok';
+                viewSourceIcon.innerHTML = '<i class="fa-brands fa-tiktok text-sm"></i>';
+                // Estilo glitch de TikTok (cian/rojo dual) aplicando la animación sólo al icono
+                viewSourceLinkBtn.className = "bg-black hover:bg-slate-900 text-white font-bold py-2.5 px-5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md";
+                viewSourceIcon.className = "flex items-center justify-center pulse-glow-tiktok";
+            } else {
+                viewSourceText.innerText = 'Ver Video';
+                viewSourceIcon.innerHTML = '<i class="fa-brands fa-youtube text-sm"></i>';
+                // Estilo glitch de YouTube (blanco/rojo dual institucional) aplicando la animación sólo al icono
+                viewSourceLinkBtn.className = "bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold py-2.5 px-5 rounded-xl text-xs flex items-center gap-2 transition-all shadow-md";
+                viewSourceIcon.className = "flex items-center justify-center pulse-glow-youtube";
+            }
+        } else {
+            videoActionBlock.classList.add('hidden');
+            videoActionBlock.classList.remove('flex');
+        }
+
+        // Favorito (Con icono Bookmark/Guardar de redes sociales, naranja de la app al estar activo)
+        const favBtn = document.getElementById('favBtn');
+        const favIcon = document.getElementById('favBtnIcon');
+        if (recipe.favorite) {
+            favBtn.className = 'text-amber-500 hover:text-amber-600 flex items-center gap-1.5 py-1';
+            favIcon.className = 'fa-solid fa-bookmark text-base';
+            document.getElementById('favBtnText').innerText = 'Quitar de Favorito';
+        } else {
+            favBtn.className = 'text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1.5 py-1';
+            favIcon.className = 'fa-regular fa-bookmark text-base';
+            document.getElementById('favBtnText').innerText = 'Agregar a Favorito';
+        }
+
+        // --- DINÁMICA DE COLOR DE "ELIMINAR RECETA" SOLICITADA POR DIEGO ---
+        const deleteRecipeBtn = document.getElementById('deleteRecipeBtn');
+        const applyDeleteBtnColor = () => {
+            const isDarkActive = document.documentElement.classList.contains('dark');
+            if (isDarkActive) {
+                // Color blanco puro en modo oscuro
+                deleteRecipeBtn.className = 'text-white hover:text-slate-200 flex items-center gap-1.5 py-1 transition-colors';
+            } else {
+                // Mismo tono gris de "Copiar" (text-slate-500) en modo claro
+                deleteRecipeBtn.className = 'text-slate-500 hover:text-slate-600 flex items-center gap-1.5 py-1 transition-colors';
+            }
+        };
+        applyDeleteBtnColor();
+        
+        // Creamos una referencia al botón para usarla después al alternar temas
+        window.updateDeleteBtnColor = applyDeleteBtnColor;
+
+        // Ingredientes
+        const ingList = document.getElementById('viewRecipeIngredients');
+        ingList.innerHTML = '';
+        if (recipe.ingredients?.trim()) {
+            if (!recipe.checkedIngredients) recipe.checkedIngredients = {};
+            recipe.ingredients.split('\n').filter(l => l.trim()).forEach((line, idx) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-start gap-3 cursor-pointer py-1.5';
+                li.onclick = () => toggleIngredientCheck(id, idx);
+                const checked = recipe.checkedIngredients[idx];
+                li.innerHTML = `
+                    <i class="fa-regular ${checked ? 'fa-square-check text-amber-500' : 'fa-square text-slate-300 dark:text-slate-600'} text-xl mt-0.5 flex-shrink-0"></i>
+                    <span class="${checked ? 'checked-ingredient' : 'text-slate-800 dark:text-slate-200 font-semibold'} leading-relaxed">${line}</span>`;
+                ingList.appendChild(li);
+            });
+        } else {
+            ingList.innerHTML = `<div class="py-4 text-center col-span-full"><p class="text-xs text-slate-400 mb-2">Sin ingredientes aún.</p><button onclick="editCurrentRecipe()" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white text-xs font-bold rounded-xl"><i class="fa-solid fa-pen"></i> Agregar</button></div>`;
+        }
+        ingList.style.fontSize = ingredientsScale + '%';
+
+        // Preparación
+        const instList = document.getElementById('viewRecipeInstructions');
+        instList.innerHTML = '';
+        if (recipe.instructions?.trim()) {
+            recipe.instructions.split('\n').filter(l => l.trim()).forEach((line, idx) => {
+                const li = document.createElement('li');
+                li.className = 'flex gap-4 items-start';
+                li.innerHTML = `
+                    <div class="flex-shrink-0 bg-amber-500 text-white w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shadow-md mt-0.5">${idx+1}</div>
+                    <div class="text-slate-800 dark:text-slate-200 leading-relaxed font-medium pt-0.5">${line}</div>`;
+                instList.appendChild(li);
+            });
+        } else {
+            instList.innerHTML = `<div class="py-4 text-center"><p class="text-xs text-slate-400 mb-2">Sin pasos aún.</p><button onclick="editCurrentRecipe()" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white text-xs font-bold rounded-xl"><i class="fa-solid fa-pen"></i> Agregar</button></div>`;
+        }
+        instList.style.fontSize = instructionsScale + '%';
+
+        updateMobileView(currentView);
+    }
+
+    // === NAVEGACIÓN MÓVIL ===
+    function isMobileLayout() {
+        return window.innerWidth < 768 || simulatedMobileMode;
+    }
+
+    // Aseguramos que la barra lateral y visor respeten el marco relativo del simulador
+    function updateMobileView(view) {
+        currentView = view; // === FIX CLAVE: Guardar persistentemente el estado de navegación ===
+        const sidebar = document.getElementById('appSidebar');
+        const viewer = document.getElementById('appViewer');
+        const backBtn = document.getElementById('mobileBackBtn');
+        const fabBtn = document.getElementById('mobileAddRecipeBtn');
+        const pcFooter = document.getElementById('pcImportFooter');
+        const mobileFooter = document.getElementById('mobileImportFooter');
+
+        if (isMobileLayout()) {
+            if (view === 'list') {
+                sidebar?.classList.remove('hidden');
+                viewer?.classList.remove('flex');
+                viewer?.classList.add('hidden');
+                backBtn?.classList.add('hidden');
+                fabBtn?.classList.remove('hidden');
+            } else {
+                sidebar?.classList.add('hidden');
+                viewer?.classList.remove('hidden');
+                viewer?.classList.add('flex');
+                backBtn?.classList.remove('hidden');
+                fabBtn?.classList.add('hidden');
+            }
+            pcFooter?.classList.add('hidden');
+            mobileFooter?.classList.remove('hidden');
+        } else {
+            sidebar?.classList.remove('hidden');
+            viewer?.classList.remove('hidden');
+            viewer?.classList.add('flex');
+            backBtn?.classList.add('hidden');
+            fabBtn?.classList.add('hidden');
+            pcFooter?.classList.remove('hidden');
+            mobileFooter?.classList.add('hidden');
+        }
+    }
+
+    // === MODO VISTA PC/MOVIL (desktop only) ===
+    function setViewMode(mode) {
+        const workspace = document.getElementById('workspace');
+        const appContainer = document.getElementById('appContainer');
+        const pcBtn = document.getElementById('pcViewBtn');
+        const mobileBtn = document.getElementById('mobileViewBtn');
+
+        if (mode === 'mobile') {
+            simulatedMobileMode = true;
+            appContainer.classList.add('simulated-mobile'); // Agregar clase forzada de simulador móvil
+            workspace.className = 'flex-1 flex items-center justify-center overflow-hidden bg-slate-900 dark:bg-slate-950';
+            // Se fuerza de manera explícita "position:relative" en el estilo dinámico para el marco simulado
+            appContainer.style.cssText = 'position:relative;width:390px;height:844px;max-width:100%;max-height:100%;border:1px solid #334155;border-radius:40px;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.5);flex-shrink:0;display:flex;flex-direction:column';
+            mobileBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-white dark:bg-slate-700 text-amber-500 shadow-sm';
+            pcBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 text-slate-600 dark:text-slate-300';
+        } else {
+            simulatedMobileMode = false;
+            appContainer.classList.remove('simulated-mobile'); // Remover clase forzada de simulador móvil
+            workspace.className = 'flex-1 flex overflow-hidden bg-slate-100 dark:bg-slate-950';
+            // Se mantiene el comportamiento relativo nativo en pantalla completa
+            appContainer.style.cssText = 'position:relative;width:100%;height:100%;display:flex;flex-direction:column';
+            if (window.innerWidth >= 768) appContainer.style.flexDirection = 'row';
+            pcBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-white dark:bg-slate-700 text-amber-500 shadow-sm';
+            mobileBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 text-slate-600 dark:text-slate-300';
+        }
+        updateMobileView(currentView);
+    }
+
+    // === FONT SIZE ===
+    function changeFontSize(dir) {
+        currentScale = Math.min(150, Math.max(70, currentScale + dir * 10));
+        localStorage.setItem('fontScale', currentScale);
+        applyFontScale();
+    }
+    function applyFontScale() {
+        document.getElementById('fontSizeDisplay').innerText = currentScale + '%';
+        document.getElementById('appContainer').style.fontSize = currentScale + '%';
+    }
+    function changeSectionFontSize(section, dir) {
+        if (section === 'ingredients') {
+            ingredientsScale = Math.min(200, Math.max(70, ingredientsScale + dir * 10));
+            document.getElementById('ingredientsScaleDisplay').innerText = ingredientsScale + '%';
+            document.getElementById('viewRecipeIngredients').style.fontSize = ingredientsScale + '%';
+        } else {
+            instructionsScale = Math.min(200, Math.max(70, instructionsScale + dir * 10));
+            document.getElementById('instructionsScaleDisplay').innerText = instructionsScale + '%';
+            document.getElementById('viewRecipeInstructions').style.fontSize = instructionsScale + '%';
+        }
+    }
+
+    // === DARK MODE ===
+    function toggleDarkMode() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        showToast(isDark ? 'Modo Oscuro 🌙' : 'Modo Claro ☀️');
+        renderRecipeList();
+        
+        // Actualizar el color de "Eliminar Receta" de forma reactiva al presionar el interruptor de modo oscuro
+        if (typeof window.updateDeleteBtnColor === 'function') {
+            window.updateDeleteBtnColor();
+        }
+    }
+
+    // === FILTROS (Con unificación Bookmark robusta para Diego) ===
+    function setCategoryFilter(cat) {
+        selectedCategoryFilter = cat;
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            const label = btn.innerText.trim();
+            // Match inteligente de categorías, incluyendo Favoritos e íconos dinámicos
+            const isFavFilter = cat === 'Favoritos' && (label.includes('Favoritos') || label.includes('Favs'));
+            const isTragoFilter = cat === 'Trago' && (label.includes('Trago') || label.includes('Tragos'));
+            const isNormalCat = label === cat;
+            const isActive = isNormalCat || isTragoFilter || isFavFilter;
+            
+            btn.className = isActive
+                ? 'category-btn px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap bg-amber-500 text-white transition-all flex items-center gap-1'
+                : 'category-btn px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all flex items-center gap-1';
+            
+            // Actualizar el estilo del ícono Bookmark de forma dinámica
+            const icon = btn.querySelector('i');
+            if (icon) {
+                if (isActive) {
+                    icon.className = 'fa-solid fa-bookmark text-white text-[10px]';
+                } else {
+                    icon.className = 'fa-regular fa-bookmark text-slate-400 dark:text-slate-500 text-[10px]';
+                }
+            }
+        });
+        renderRecipeList();
+    }
+    function filterRecipes() { renderRecipeList(); }
+
+    // === FAVORITOS ===
+    function toggleFavoriteActive() {
+        if (!activeRecipeId) return;
+        const r = recipes.find(r => r.id === activeRecipeId);
+        if (r) { r.favorite = !r.favorite; saveToLocalStorage(); saveRecipeToCloud(r); selectRecipe(activeRecipeId, false); showToast(r.favorite ? '🔖 Añadida a favoritos' : '🔖 Quitada de favoritos'); }
+    }
+    function toggleFavoriteInline(e, id) {
+        e.stopPropagation();
+        const r = recipes.find(r => r.id === id);
+        if (r) { r.favorite = !r.favorite; saveToLocalStorage(); saveRecipeToCloud(r); renderRecipeList(); if (id === activeRecipeId) selectRecipe(id, false); showToast(r.favorite ? '🔖 Favorito' : '🔖 Quitado'); }
+    }
+
+    // === INGREDIENTES CHECK ===
+    function toggleIngredientCheck(recipeId, idx) {
+        const r = recipes.find(r => r.id === recipeId);
+        if (!r) return;
+        if (!r.checkedIngredients) r.checkedIngredients = {};
+        r.checkedIngredients[idx] = !r.checkedIngredients[idx];
+        saveToLocalStorage();
+        saveRecipeToCloud(r);
+        selectRecipe(recipeId, false);
+    }
+
+    // === MODALES ===
+    function openImportModal() {
+        ['importDescriptionInput','importLinkInput','importImageUrlInput'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        document.getElementById('importModal').classList.remove('hidden');
+    }
+    function closeImportModal() { document.getElementById('importModal').classList.add('hidden'); }
+
+    // CONFIGURACIÓN
+    function openConfigModal() {
+        document.getElementById('configModal').classList.remove('hidden');
+        document.getElementById('userApiKeyInput').value = localStorage.getItem('gemini_api_key') || '';
+        document.getElementById('syncCodeInput').value = localStorage.getItem('diego_sync_key') || '';
+        const rd = document.getElementById('apiTestResult');
+        rd.className = 'text-[10px] p-2.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 block';
+        rd.innerHTML = localStorage.getItem('gemini_api_key') ? '✅ Clave API guardada.' : '💡 Sin clave personalizada. Usa el motor local.';
+    }
+    function closeConfigModal() { document.getElementById('configModal').classList.add('hidden'); }
+    function openBackupModal() { document.getElementById('backupModal').classList.remove('hidden'); }
+    function closeBackupModal() { document.getElementById('backupModal').classList.add('hidden'); }
+
+    function openManualRecipeModal() {
+        document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
+        document.getElementById('editRecipeId').value = '';
+        ['formTitle','formTime','formInstagramUrl','formImageUrl','formIngredients','formInstructions'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        document.getElementById('formCategory').value = 'Desayuno';
+        document.getElementById('recipeModal').classList.remove('hidden');
+    }
+    function closeRecipeModal() { document.getElementById('recipeModal').classList.add('hidden'); }
+
+    // === GUARDAR RECETA ===
+    function saveRecipe(e) {
+        if (e) e.preventDefault();
+        const id = document.getElementById('editRecipeId').value;
+        const recipe = {
+            title: document.getElementById('formTitle').value.trim(),
+            category: document.getElementById('formCategory').value,
+            time: document.getElementById('formTime').value.trim() || '30',
+            instagramUrl: document.getElementById('formInstagramUrl').value.trim(),
+            imageUrl: document.getElementById('formImageUrl').value.trim(),
+            ingredients: document.getElementById('formIngredients').value.trim(),
+            instructions: document.getElementById('formInstructions').value.trim(),
+        };
+        if (!recipe.title) { showToast('El nombre es obligatorio', 'error'); return; }
+
+        if (id) {
+            const idx = recipes.findIndex(r => r.id === id);
+            if (idx !== -1) { recipes[idx] = { ...recipes[idx], ...recipe }; saveRecipeToCloud(recipes[idx]); showToast('✅ Receta actualizada'); }
+        } else {
+            const newR = { id: 'manual-' + Date.now(), ...recipe, favorite: false, checkedIngredients: {} };
+            recipes.unshift(newR);
+            activeRecipeId = newR.id;
+            saveRecipeToCloud(newR);
+            showToast('📖 Receta guardada');
+        }
+        saveToLocalStorage();
+        renderRecipeList();
+        selectRecipe(activeRecipeId, true);
+        closeRecipeModal();
+    }
+
+    // === EDITAR RECETA ===
+    function editCurrentRecipe() {
+        if (!activeRecipeId) return;
+        const r = recipes.find(r => r.id === activeRecipeId);
+        if (!r) return;
+        document.getElementById('recipeModalTitle').innerText = 'Editar Receta';
+        document.getElementById('editRecipeId').value = r.id;
+        document.getElementById('formTitle').value = r.title;
+        document.getElementById('formCategory').value = r.category || 'Otros';
+        document.getElementById('formTime').value = r.time || '';
+        document.getElementById('formInstagramUrl').value = r.instagramUrl || '';
+        document.getElementById('formImageUrl').value = r.imageUrl || '';
+        document.getElementById('formIngredients').value = r.ingredients || '';
+        document.getElementById('formInstructions').value = r.instructions || '';
+        document.getElementById('recipeModal').classList.remove('hidden');
+    }
+
+    // === ELIMINAR RECETA ===
+    function confirmDeleteCurrentRecipe() {
+        if (!activeRecipeId) return;
+        document.getElementById('deleteConfirmModal').classList.remove('hidden');
+        document.getElementById('confirmDeleteBtn').onclick = async () => {
+            const id = activeRecipeId;
+            recipes = recipes.filter(r => r.id !== id);
+            saveToLocalStorage();
+            await deleteRecipeFromCloud(id);
+            renderRecipeList();
+            document.getElementById('deleteConfirmModal').classList.add('hidden');
+            if (recipes.length > 0) selectRecipe(recipes[0].id, false);
+            else {
+                document.getElementById('activeRecipeContent').classList.add('hidden');
+                document.getElementById('emptyStateViewer').classList.remove('hidden');
+            }
+            updateMobileView('list');
+            showToast('🗑️ Receta eliminada');
+        };
+    }
+    function closeDeleteConfirmModal() { document.getElementById('deleteConfirmModal').classList.add('hidden'); }
+
+    // === API KEY ===
+    async function testAndSaveApiKey() {
+        const key = document.getElementById('userApiKeyInput').value.trim();
+        const rd = document.getElementById('apiTestResult');
+        rd.className = 'text-xs p-3 rounded-lg bg-slate-100 text-slate-700 block';
+        rd.innerHTML = "<i class='fa-solid fa-spinner animate-spin mr-1'></i> Conectando...";
+        try {
+            const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ contents: [{ parts: [{ text: 'Hola' }] }] })
+            });
+            const d = await r.json();
+            if (r.ok && d.candidates) {
+                localStorage.setItem('gemini_api_key', key);
+                rd.className = 'text-xs p-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 block';
+                rd.innerHTML = '✅ ¡Clave válida y guardada!';
+            } else {
+                rd.className = 'text-xs p-3 rounded-lg bg-red-50 text-red-800 border border-red-200 block';
+                rd.innerHTML = '❌ ' + (d.error?.message || 'Clave inválida');
+            }
+        } catch(e) {
+            rd.className = 'text-xs p-3 rounded-lg bg-red-50 text-red-800 border border-red-200 block';
+            rd.innerHTML = '❌ Error de conexión';
+        }
+    }
+
+    // === SYNC CLOUD (KVDB) ===
+    async function triggerCloudPush() {
+        const key = document.getElementById('syncCodeInput').value.trim().toUpperCase();
+        if (!key) { showToast('Ingresa una clave', 'error'); return; }
+        localStorage.setItem('diego_sync_key', key);
+        showToast('Subiendo...');
+        try {
+            const r = await fetch(`https://kvdb.io/recetarioDiego2026Bucket/${key}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(recipes) });
+            showToast(r.ok ? '☁️ ¡Subido con éxito!' : 'Error al subir', r.ok ? 'success' : 'error');
+        } catch(e) { showToast('Error de red', 'error'); }
+    }
+    async function triggerCloudPull() {
+        const key = document.getElementById('syncCodeInput').value.trim().toUpperCase();
+        if (!key) { showToast('Ingresa una clave', 'error'); return; }
+        localStorage.setItem('diego_sync_key', key);
+        showToast('Descargando...');
+        try {
+            const r = await fetch(`https://kvdb.io/recetarioDiego2026Bucket/${key}`);
+            if (r.ok) {
+                const data = await r.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    recipes = data; saveToLocalStorage(); renderRecipeList();
+                    if (recipes.length > 0) selectRecipe(recipes[0].id, false);
+                    showToast('📥 Recetario sincronizado!');
+                } else showToast('Sin recetas bajo esta clave', 'error');
+            } else showToast('Clave no encontrada', 'error');
+        } catch(e) { showToast('Error de red', 'error'); }
+    }
+
+    // === IMPORTADOR IA ===
+    async function callGeminiAPI(apiKey, payload) {
+        const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+        for (const model of models) {
+            try {
+                const r = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+                }, 12000);
+                if (!r.ok) continue;
+                const d = await r.json();
+                const text = d.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) return text;
+            } catch(e) { console.warn(model, e); }
+        }
+        throw new Error('No se pudo conectar con Gemini');
+    }
+
+    function smartParse(text, title = '') {
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+        const ing = [], inst = [];
+        let inInst = false;
+        lines.forEach(line => {
+            if (/https?:|suscri|instagram|tiktok|follow|descuento/i.test(line)) return;
+            if (/preparación|pasos|instrucciones|procedimiento|preparation|steps/i.test(line)) { inInst = true; return; }
+            if (inInst || /^\d+\.?\s+/.test(line) || /^(mezclar|picar|hornear|cocinar|batir|agregar|calentar|servir|licuar)/i.test(line)) inst.push(line);
+            else ing.push(line);
+        });
+        return { title: title || 'Receta 🍽️', category: 'Otros', time: '30', ingredients: ing.join('\n'), instructions: inst.join('\n') };
+    }
+
+    async function processPastedDescriptionWithAI() {
+        const text = document.getElementById('importDescriptionInput').value.trim();
+        const url = document.getElementById('importLinkInput').value.trim();
+        const imgUrl = document.getElementById('importImageUrlInput').value.trim();
+        if (!text && !url) { showToast('Ingresa un enlace o texto', 'error'); return; }
+
+        const loading = document.getElementById('loadingModal');
+        const progress = document.getElementById('loadingProgressText');
+        loading.classList.remove('hidden');
+        progress.innerText = 'Conectando con IA...';
+
+        const apiKey = localStorage.getItem('gemini_api_key') || '';
+        let titleRef = 'Nueva Receta 🍽️';
+
+        if (url) {
+            try {
+                const r = await fetchWithTimeout(`https://noembed.com/embed?url=${encodeURIComponent(url)}`, {}, 4000);
+                if (r.ok) { const d = await r.json(); if (d.title) titleRef = d.title; }
+            } catch(e) {}
+        }
+
+        if (!apiKey && !text) {
+            loading.classList.add('hidden');
+            const nr = { id:'draft-'+Date.now(), title:titleRef, category:'Otros', time:'30', instagramUrl:url, imageUrl:imgUrl, ingredients:'', instructions:'', favorite:false, checkedIngredients:{} };
+            recipes.unshift(nr); saveToLocalStorage(); saveRecipeToCloud(nr); renderRecipeList(); selectRecipe(nr.id, true); closeImportModal();
+            showToast('Borrador creado. Edítalo para completarlo.');
+            return;
+        }
+
+        if (!apiKey && text) {
+            loading.classList.add('hidden');
+            const parsed = smartParse(text, titleRef);
+            const nr = { id:'local-'+Date.now(), ...parsed, instagramUrl:url, imageUrl:imgUrl, favorite:false, checkedIngredients:{} };
+            recipes.unshift(nr); saveToLocalStorage(); saveRecipeToCloud(nr); renderRecipeList(); selectRecipe(nr.id, true); closeImportModal();
+            showToast('⚠️ Procesado con motor local (sin API key)');
+            return;
+        }
+
+        try {
+            progress.innerText = text ? 'Estructurando y traduciendo...' : 'Buscando receta en el video...';
+            const systemInstr = `Eres un chef profesional. Transforma el contenido en una receta JSON en español latinoamericano. Convierte todas las medidas a gramos/ml. Responde SOLO con JSON puro:
+{"title":"Nombre con emoji","category":"Desayuno|Almuerzo|Postre|Trago|Otros","time":"minutos","ingredients":"ing1\ning2","instructions":"paso1\npaso2"}`;
+            const payload = {
+                contents: [{ parts: [{ text: text ? `Receta:\n${text}` : `Extrae la receta de: ${url}. Título: ${titleRef}` }] }],
+                systemInstruction: { parts: [{ text: systemInstr }] },
+                generationConfig: { responseMimeType: 'application/json' }
+            };
+            if (!text) { payload.tools = [{ google_search: {} }]; delete payload.generationConfig; }
+
+            const raw = await callGeminiAPI(apiKey, payload);
+            let parsed;
+            try { parsed = JSON.parse(raw.trim()); }
+            catch(e) { const m = raw.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : null; }
+            if (!parsed) throw new Error('JSON inválido');
+
+            const nr = { id:'ai-'+Date.now(), title:parsed.title||titleRef, category:parsed.category||'Otros', time:parsed.time||'30', instagramUrl:url, imageUrl:imgUrl, ingredients:parsed.ingredients||'', instructions:parsed.instructions||'', favorite:false, checkedIngredients:{} };
+            recipes.unshift(nr); saveToLocalStorage(); saveRecipeToCloud(nr); renderRecipeList(); selectRecipe(nr.id, true); closeImportModal();
+            loading.classList.add('hidden');
+            showToast('🍳 ¡Receta importada con IA!');
+        } catch(err) {
+            loading.classList.add('hidden');
+            const nr = { id:'draft-err-'+Date.now(), title:titleRef, category:'Otros', time:'30', instagramUrl:url, imageUrl:imgUrl, ingredients:'', instructions:'', favorite:false, checkedIngredients:{} };
+            recipes.unshift(nr); saveToLocalStorage(); saveRecipeToCloud(nr); renderRecipeList(); selectRecipe(nr.id, true); closeImportModal();
+            showToast('Error IA. Borrador creado para editar.', 'error');
+        }
+    }
+
+    // === COPIAR / COMPARTIR ===
+    function getFormattedText(r) {
+        let t = `🍳 *${r.title.toUpperCase()}*\n📁 ${r.category} | ⏱️ ${r.time||'--'} mins`;
+        if (r.instagramUrl) t += `\n🔗 ${r.instagramUrl}`;
+        if (r.ingredients?.trim()) t += `\n\n📝 *INGREDIENTES:*\n` + r.ingredients.split('\n').map(l=>`• ${l}`).join('\n');
+        if (r.instructions?.trim()) t += `\n\n🥣 *PREPARACIÓN:*\n` + r.instructions.split('\n').map((l,i)=>`${i+1}. ${l}`).join('\n');
+        return t;
+    }
+    function copyRecipeToClipboard() {
+        if (!activeRecipeId) return;
+        const r = recipes.find(r=>r.id===activeRecipeId); if (!r) return;
+        navigator.clipboard?.writeText(getFormattedText(r)).then(()=>showToast('📋 Copiado!')).catch(()=>{
+            const ta = document.createElement('textarea'); ta.value = getFormattedText(r);
+            document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+            showToast('📋 Copiado!');
+        });
+    }
+    function sendRecipeToWhatsApp() {
+        if (!activeRecipeId) return;
+        const r = recipes.find(r=>r.id===activeRecipeId); if (!r) return;
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(getFormattedText(r))}`, '_blank');
+    }
+
+    // === PDF REDISEÑADO (Ajustado para evitar páginas vacías en TikTok, Instagram y YouTube, box-sizing total, y resplandor de video) ===
+    function downloadRecipePDF() {
+        if (!activeRecipeId) return;
+        const r = recipes.find(r=>r.id===activeRecipeId); if (!r) return;
+        let banner = 'https://images.unsplash.com/photo-1495521821757-a1efb6729352?q=80&w=800&auto=format&fit=crop';
+        if (r.imageUrl?.trim()) {
+            banner = r.imageUrl;
+        } else {
+            const ytId = getYouTubeId(r.instagramUrl);
+            if (ytId) {
+                banner = `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`;
+            } else {
+                if (r.category === 'Desayuno') banner = 'https://images.unsplash.com/photo-1525351484163-7529414344d8?q=80&w=800&auto=format&fit=crop';
+                else if (r.category === 'Almuerzo') banner = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=800&auto=format&fit=crop';
+                else if (r.category === 'Postre') banner = 'https://images.unsplash.com/photo-1551024601-bec78aea704b?q=80&w=800&auto=format&fit=crop';
+                else if (r.category === 'Trago') banner = 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?q=80&w=800&auto=format&fit=crop';
+            }
+        }
+
+        const container = document.createElement('div');
+        // Unificación estricta del ancho virtual a 700px con box-sizing y padding óptimo para calzar en 1 sola hoja de forma consistente
+        container.style.cssText = 'width:700px; background:#ffffff; font-family:Outfit,Helvetica,Arial,sans-serif; color:#1e293b; padding:35px; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden;';
+
+        const ings = r.ingredients?.split('\n').filter(l=>l.trim()).map(l=>`<li style="display:flex;align-items:start;gap:10px;font-size:15px;color:#1e293b;margin-bottom:8px;break-inside:avoid;box-sizing:border-box;"><span style="color:#f59e0b;font-size:14px;margin-top:2px">✔</span><span style="font-weight:600;line-height:1.4">${l}</span></li>`).join('') || '<li style="color:#94a3b8;font-size:15px">Sin ingredientes.</li>';
+        const steps = r.instructions?.split('\n').filter(l=>l.trim()).map((l,i)=>`<div style="display:flex;gap:12px;align-items:start;margin-bottom:12px;break-inside:avoid;box-sizing:border-box;"><div style="background:#f59e0b;color:#ffffff;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:2px">${i+1}</div><div style="font-size:14px;color:#334155;line-height:1.5;font-weight:500;padding-top:1px">${l}</div></div>`).join('') || '<p style="color:#94a3b8;font-size:15px">Sin pasos de preparación.</p>';
+
+        const isIG = r.instagramUrl?.includes('instagram.com');
+        const isTikTok = r.instagramUrl?.includes('tiktok.com');
+        let platformLabel = 'Ver Video';
+        let platformColor = '#ef4444'; // YouTube Red
+        let glowStyle = 'box-shadow: -3px -3px 0px rgba(255,255,255,0.6), 3px 3px 0px rgba(239,68,68,0.6);'; // Glitch Youtube
+        
+        if (isIG) { 
+            platformLabel = 'Ver Reel'; 
+            platformColor = '#d946ef'; 
+            glowStyle = 'box-shadow: -3px -3px 0px rgba(245,158,11,0.6), 3px 3px 0px rgba(217,70,239,0.6);'; // Glitch Instagram
+        } else if (isTikTok) { 
+            platformLabel = 'Ver TikTok'; 
+            platformColor = '#09090b'; 
+            glowStyle = 'box-shadow: -3px -3px 0px rgba(0,242,234,0.6), 3px 3px 0px rgba(254,44,85,0.6);'; // Glitch TikTok
+        }
+
+        // Caja de video sin color vino tinto en el PDF, con tipografía grande y legible
+        const videoBlockHtml = r.instagramUrl ? `
+        <div style="margin-bottom:20px; background:#f8fafc; border:1.5px solid #e2e8f0; padding:18px; border-radius:14px; display:flex; align-items:center; justify-content:space-between; gap:15px; break-inside:avoid; box-sizing:border-box;">
+          <div style="flex: 1; padding-right: 10px; box-sizing:border-box;">
+            <p style="font-size:15px; font-weight:800; color:#0f172a; margin:0 0 4px 0; font-family:Outfit,sans-serif;">¿Quieres ver la preparación paso a paso?</p>
+            <p style="font-size:12px; color:#475569; margin:0; font-weight:500; font-family:Outfit,sans-serif;">Si quieres ver la receta original haz click en el botón.</p>
+          </div>
+          <a href="${r.instagramUrl}" style="background:${platformColor}; color:#ffffff; font-weight:800; padding:10px 18px; border-radius:10px; font-size:12px; text-decoration:none; display:inline-block; text-align:center; ${glowStyle} flex-shrink:0;">
+            ${platformLabel}
+          </a>
+        </div>
+        ` : '';
+
+        // Renderizado del PDF (Sin "Ver origen" arriba, con el bloque interactivo limpio y ajustado)
+        container.innerHTML = `
+<div style="box-sizing:border-box;">
+    <!-- Encabezado con foto grande -->
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #f1f5f9;padding-bottom:15px;margin-bottom:20px;gap:20px;box-sizing:border-box;">
+      <div style="flex:1">
+        <span style="background:#fef3c7;color:#b45309;font-size:11px;font-weight:800;padding:5px 12px;border-radius:6px;text-transform:uppercase;letter-spacing:1px">${r.category}</span>
+        <h1 style="font-size:28px;font-weight:800;color:#0f172a;margin:10px 0 6px;line-height:1.2;font-family:Playfair Display,serif;">${r.title}</h1>
+        <p style="font-size:13px;color:#64748b;font-weight:600;display:flex;align-items:center;gap:6px">⏱️ Tiempo de cocción: ${r.time||'--'} minutos</p>
+      </div>
+      <div style="width:110px;height:110px;border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 3px 8px rgba(0,0,0,0.06)">
+        <img src="${banner}" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover" onerror="this.src='https://images.unsplash.com/photo-1495521821757-a1efb6729352?q=80&w=800&auto=format&fit=crop'">
+      </div>
+    </div>
+
+    <!-- Bloque de video original insertado con diseño premium libre de vino tinto -->
+    ${videoBlockHtml}
+
+    <!-- Caja de Ingredientes a 2 Columnas -->
+    <div style="margin-bottom:20px;background:#fffbeb;border:1.5px solid #fde68a;padding:20px;border-radius:14px;box-sizing:border-box;">
+      <h3 style="font-size:16px;font-weight:800;color:#78350f;border-bottom:2px solid #fcd34d;padding-bottom:10px;margin:0 0 12px;font-family:Playfair Display,serif;">Ingredientes</h3>
+      <ul style="list-style:none;padding:0;margin:0;column-count:2;column-gap:25px;box-sizing:border-box;">${ings}</ul>
+    </div>
+
+    <!-- Caja de Preparación -->
+    <div style="margin-bottom:20px;background:#ffffff;border:1.5px solid #e2e8f0;padding:20px;border-radius:14px;box-sizing:border-box;">
+      <h3 style="font-size:16px;font-weight:800;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin:0 0 14px;font-family:Playfair Display,serif;">Preparación</h3>
+      <div style="box-sizing:border-box;">${steps}</div>
+    </div>
+</div>
+
+<!-- Pie de página al fondo sin saltar de hoja -->
+<div style="text-align:center;border-top:2px solid #f1f5f9;padding-top:12px;font-size:10px;color:#94a3b8;font-weight:700;letter-spacing:0.5px;box-sizing:border-box;margin-top:10px;">
+  Mi Recetario Privado — Diego 2026 🍳
+</div>`;
+
+        const opt = { 
+            margin: 8, 
+            filename: `Receta_${r.title.replace(/\s+/g,'_')}.pdf`, 
+            image: { type: 'jpeg', quality: 1.0 }, 
+            html2canvas: { scale: 3, useCORS: true, letterRendering: true }, 
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: false }, 
+            pagebreak: { mode: ['avoid-all', 'css'] } 
+        };
+        
+        showToast('📥 Generando PDF...');
+        if (typeof html2pdf !== 'undefined') {
+            html2pdf().from(container).set(opt).save();
+        } else {
+            showToast('html2pdf no disponible (requiere internet)', 'error');
+        }
+    }
+
+    // === EXPORTAR A MICROSOFT WORD (Función nativa) ===
+    function downloadRecipeWord() {
+        if (!activeRecipeId) return;
+        const r = recipes.find(r => r.id === activeRecipeId);
+        if (!r) return;
+
+        // Formatear ingredientes y pasos para renderizado limpio de MS Word
+        const ings = r.ingredients?.split('\n').filter(l => l.trim()).map(l => `<li>${l}</li>`).join('') || '<li>Sin ingredientes.</li>';
+        const steps = r.instructions?.split('\n').filter(l => l.trim()).map(l => `<li>${l}</li>`).join('') || '<li>Sin pasos de preparación.</li>';
+
+        // Estructura XML de Word compatible con estilos CSS inline
+        const htmlContent = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+                <title>${r.title}</title>
+                <!--[if gte mso 9]>
+                <xml>
+                    <w:WordDocument>
+                        <w:View>Print</w:View>
+                        <w:Zoom>100</w:Zoom>
+                    </w:WordDocument>
+                </xml>
+                <![endif]-->
+                <style>
+                    body { font-family: 'Arial', sans-serif; color: #1e293b; padding: 25px; }
+                    h1 { color: #0f172a; font-size: 22pt; margin-bottom: 5pt; font-weight: bold; }
+                    .category { background: #fef3c7; color: #b45309; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 10pt; display: inline-block; text-transform: uppercase; }
+                    .meta { font-size: 11pt; color: #64748b; margin-bottom: 20px; }
+                    .section-title { font-size: 15pt; color: #78350f; border-bottom: 2px solid #fcd34d; padding-bottom: 5px; margin-top: 25px; margin-bottom: 12px; font-weight: bold; }
+                    ul, ol { margin-left: 20px; line-height: 1.6; }
+                    li { margin-bottom: 8px; font-size: 12pt; }
+                    .video-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+                    .video-box a { color: #ef4444; font-weight: bold; text-decoration: underline; }
+                </style>
+            </head>
+            <body>
+                <span class="category">${r.category}</span>
+                <h1>${r.title}</h1>
+                <p class="meta"><b>Tiempo de cocción:</b> ${r.time || '--'} minutos</p>
+                
+                ${r.instagramUrl ? `
+                <div class="video-box">
+                    <p style="margin: 0; font-weight: bold; font-size: 12pt;">¿Quieres ver la preparación paso a paso?</p>
+                    <p style="margin: 3px 0 10px 0; font-size: 10pt; color: #64748b;">Si quieres ver la receta original haz click en el enlace:</p>
+                    <a href="${r.instagramUrl}" target="_blank">Ver Video Original 🔗</a>
+                </div>
+                ` : ''}
+
+                <div class="section-title">Ingredientes</div>
+                <ul>${ings}</ul>
+
+                <div class="section-title">Preparación</div>
+                <ol>${steps}</ol>
+
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin-top: 45px;" />
+                <p style="text-align: center; font-size: 10pt; color: #94a3b8; font-style: italic;">Mi Recetario Privado — Diego 2026 🍳</p>
+            </body>
+            </html>
+        `;
+
+        const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Receta_${r.title.replace(/\s+/g, '_')}.doc`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast('💾 Documento Word descargado');
+    }
+
+    // === BACKUP ===
+    function downloadBackup() {
+        const a = document.createElement('a');
+        a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(recipes, null, 2));
+        a.download = 'Mi_Recetario_Diego_2026.json';
+        a.click();
+        showToast('💾 Backup descargado');
+    }
+    function importBackup(e) {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                if (Array.isArray(data)) {
+                    recipes = data; saveToLocalStorage(); renderRecipeList();
+                    if (recipes.length > 0) selectRecipe(recipes[0].id, false);
+                    closeBackupModal(); showToast('🔄 Recetario restaurado!');
+                }
+            } catch(e) { showToast('Error al leer el JSON', 'error'); }
+        };
+        reader.readAsText(file);
+    }
+
+    // === EXPONER AL WINDOW ===
+    Object.assign(window, {
+        selectRecipe, toggleFavoriteInline, toggleFavoriteActive,
+        setCategoryFilter, filterRecipes,
+        openImportModal, closeImportModal, openConfigModal, closeConfigModal,
+        openBackupModal, closeBackupModal, openManualRecipeModal, closeRecipeModal,
+        testAndSaveApiKey, triggerCloudPush, triggerCloudPull,
+        processPastedDescriptionWithAI, saveRecipe, editCurrentRecipe,
+        confirmDeleteCurrentRecipe, closeDeleteConfirmModal,
+        copyRecipeToClipboard, sendRecipeToWhatsApp, downloadRecipePDF, downloadRecipeWord,
+        downloadBackup, importBackup, updateMobileView,
+        changeFontSize, changeSectionFontSize, setViewMode, toggleDarkMode
+    });
+</script>
+</div>
+</body>
+</html>
