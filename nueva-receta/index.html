@@ -303,15 +303,21 @@
 <div id="app-root" class="flex flex-col h-full relative z-10">
 
     <!-- HEADER GLOBAL (Cristal Líquido) -->
-    <header id="global-header" class="glass-panel border-b border-white/20 dark:border-white/5 px-6 py-3 flex items-center justify-end gap-3 z-20 shadow-lg flex-shrink-0" style="padding-top: max(0.75rem, calc(0.5rem + env(safe-area-inset-top)))">
-        <div class="flex items-center gap-3">
+    <header id="global-header" class="glass-panel border-b border-white/20 dark:border-white/5 px-3 sm:px-6 py-3 flex items-center justify-between gap-2 sm:gap-3 z-20 shadow-lg flex-shrink-0" style="padding-top: max(0.75rem, calc(0.5rem + env(safe-area-inset-top)))">
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div class="bg-gradient-to-tr from-blue-500 to-indigo-500 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                <i class="fa-solid fa-book-open text-sm"></i>
+            </div>
+            <h1 class="font-extrabold text-sm text-slate-900 dark:text-white whitespace-nowrap hidden sm:block">Recetas de Diego</h1>
+        </div>
+        <div class="flex items-center gap-1.5 sm:gap-3">
             <!-- Zoom global -->
             <div class="flex items-center gap-1 bg-white/40 dark:bg-black/30 p-1 rounded-xl border border-white/30 dark:border-white/5 backdrop-blur-md">
-                <button onclick="changeFontSize(-1)" class="w-8 h-8 rounded-lg bg-white/80 dark:bg-slate-800 hover:bg-blue-500 hover:text-white flex items-center justify-center font-bold text-sm transition-all shadow-sm">
+                <button onclick="changeFontSize(-1)" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/80 dark:bg-slate-800 hover:bg-blue-500 hover:text-white flex items-center justify-center font-bold text-sm transition-all shadow-sm">
                     <i class="fa-solid fa-minus text-xs"></i>
                 </button>
-                <span id="fontSizeDisplay" class="text-xs font-extrabold text-slate-800 dark:text-slate-200 px-2 min-w-[36px] text-center">100%</span>
-                <button onclick="changeFontSize(1)" class="w-8 h-8 rounded-lg bg-white/80 dark:bg-slate-800 hover:bg-blue-500 hover:text-white flex items-center justify-center font-bold text-sm transition-all shadow-sm">
+                <span id="fontSizeDisplay" class="text-xs font-extrabold text-slate-800 dark:text-slate-200 px-1.5 sm:px-2 min-w-[32px] sm:min-w-[36px] text-center">100%</span>
+                <button onclick="changeFontSize(1)" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/80 dark:bg-slate-800 hover:bg-blue-500 hover:text-white flex items-center justify-center font-bold text-sm transition-all shadow-sm">
                     <i class="fa-solid fa-plus text-xs"></i>
                 </button>
             </div>
@@ -327,8 +333,16 @@
             </div>
 
             <!-- Modo oscuro -->
-            <button onclick="toggleDarkMode()" class="w-10 h-10 rounded-xl bg-white/80 dark:bg-slate-800 hover:bg-blue-500 dark:hover:bg-blue-500 hover:text-white flex items-center justify-center text-slate-600 dark:text-blue-400 transition-colors shadow-sm">
+            <button onclick="toggleDarkMode()" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/80 dark:bg-slate-800 hover:bg-blue-500 dark:hover:bg-blue-500 hover:text-white flex items-center justify-center text-slate-600 dark:text-blue-400 transition-colors shadow-sm flex-shrink-0">
                 <i class="fa-solid fa-circle-half-stroke"></i>
+            </button>
+
+            <!-- Ajustes y Backup -->
+            <button onclick="openConfigModal()" class="text-slate-600 dark:text-slate-300 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/80 dark:bg-slate-800 hover:bg-blue-500 hover:text-white transition-all shadow-sm flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+            <button onclick="openBackupModal()" class="text-slate-600 dark:text-slate-300 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/80 dark:bg-slate-800 hover:bg-blue-500 hover:text-white transition-all shadow-sm flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-database"></i>
             </button>
         </div>
     </header>
@@ -341,26 +355,6 @@
 
             <!-- SIDEBAR -->
             <aside id="appSidebar" class="w-full md:w-[380px] bg-white/30 dark:bg-slate-900/40 border-r border-white/20 dark:border-white/5 flex flex-col h-full flex-shrink-0 overflow-y-auto ios-scroll backdrop-blur-xl">
-
-                <!-- Header sidebar -->
-                <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between flex-shrink-0 bg-white/20 dark:bg-black/10">
-                    <div class="flex items-center gap-3">
-                        <div class="bg-gradient-to-tr from-blue-500 to-indigo-500 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
-                            <i class="fa-solid fa-book-open text-sm"></i>
-                        </div>
-                        <div>
-                            <h1 class="font-extrabold text-sm text-slate-900 dark:text-white">Recetas de Diego</h1>
-                        </div>
-                    </div>
-                    <div class="flex gap-1.5">
-                        <button onclick="openConfigModal()" class="text-slate-600 dark:text-slate-300 p-2 rounded-xl bg-white/50 dark:bg-slate-800/50 hover:bg-blue-500 hover:text-white transition-all shadow-sm" style="min-height:38px;min-width:38px">
-                            <i class="fa-solid fa-gear"></i>
-                        </button>
-                        <button onclick="openBackupModal()" class="text-slate-600 dark:text-slate-300 p-2 rounded-xl bg-white/50 dark:bg-slate-800/50 hover:bg-blue-500 hover:text-white transition-all shadow-sm" style="min-height:38px;min-width:38px">
-                            <i class="fa-solid fa-database"></i>
-                        </button>
-                    </div>
-                </div>
 
                 <!-- Buscador e interruptores de categorías -->
                 <div class="px-4 py-3 border-b border-white/10 bg-white/10 dark:bg-black/5 flex-shrink-0">
@@ -382,21 +376,23 @@
                     </div>
                 </div>
 
-                <!-- Lista de recetas -->
-                <div class="p-4 space-y-3" id="recipeListContainer"></div>
-
                 <!-- Footer Unificado del Importador IA (Visible en PC y en la lista móvil) -->
-                <div id="sidebarImportFooter" class="p-4 border-t border-white/10 bg-white/20 dark:bg-slate-950/20 flex-shrink-0 space-y-2">
-                    <button onclick="openImportModal()" class="w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-sky-500 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-xs">
-                        <i class="fa-solid fa-wand-magic-sparkles animate-pulse"></i>
-                        Importador Inteligente IA
-                    </button>
-                    <button onclick="triggerRecipePhotoCapture()" class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-xs">
-                        <i class="fa-solid fa-camera"></i>
-                        Escanear Receta a Mano
-                    </button>
+                <div id="sidebarImportFooter" class="p-4 border-b border-white/10 bg-white/20 dark:bg-slate-950/20 flex-shrink-0">
+                    <div class="flex items-center gap-2">
+                        <button onclick="openImportModal()" class="flex-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-sky-500 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-2 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-xs">
+                            <i class="fa-solid fa-wand-magic-sparkles animate-pulse"></i>
+                            Importar Receta
+                        </button>
+                        <button onclick="triggerRecipePhotoCapture()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-2 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-xs">
+                            <i class="fa-solid fa-camera"></i>
+                            Importar Receta
+                        </button>
+                    </div>
                     <input type="file" id="recipePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="processRecipePhoto(event)">
                 </div>
+
+                <!-- Lista de recetas -->
+                <div class="p-4 space-y-3" id="recipeListContainer"></div>
             </aside>
 
             <!-- VISOR DE RECETA -->
