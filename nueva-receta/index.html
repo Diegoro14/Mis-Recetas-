@@ -340,7 +340,7 @@
         <div id="appContainer" class="relative w-full h-full flex flex-col md:flex-row glass-panel md:rounded-3xl overflow-hidden shadow-2xl transition-all duration-500">
 
             <!-- SIDEBAR -->
-            <aside id="appSidebar" class="w-full md:w-[380px] bg-white/30 dark:bg-slate-900/40 border-r border-white/20 dark:border-white/5 flex flex-col h-full flex-shrink-0 overflow-hidden backdrop-blur-xl">
+            <aside id="appSidebar" class="w-full md:w-[380px] bg-white/30 dark:bg-slate-900/40 border-r border-white/20 dark:border-white/5 flex flex-col h-full flex-shrink-0 overflow-y-auto ios-scroll backdrop-blur-xl">
 
                 <!-- Header sidebar -->
                 <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between flex-shrink-0 bg-white/20 dark:bg-black/10">
@@ -360,13 +360,6 @@
                             <i class="fa-solid fa-database"></i>
                         </button>
                     </div>
-                </div>
-
-                <!-- Nueva receta manual -->
-                <div class="px-4 py-3 border-b border-white/10 flex-shrink-0">
-                    <button onclick="openManualRecipeModal()" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 active:scale-95 text-white py-3 px-4 rounded-xl font-extrabold flex items-center justify-center gap-2 text-xs transition-all shadow-md">
-                        <i class="fa-solid fa-circle-plus"></i> Nueva Receta Manual
-                    </button>
                 </div>
 
                 <!-- Buscador e interruptores de categorías -->
@@ -390,7 +383,7 @@
                 </div>
 
                 <!-- Lista de recetas -->
-                <div class="flex-1 ios-scroll p-4 space-y-3" id="recipeListContainer"></div>
+                <div class="p-4 space-y-3" id="recipeListContainer"></div>
 
                 <!-- Footer Unificado del Importador IA (Visible en PC y en la lista móvil) -->
                 <div id="sidebarImportFooter" class="p-4 border-t border-white/10 bg-white/20 dark:bg-slate-950/20 flex-shrink-0 space-y-2">
@@ -568,9 +561,6 @@
             </main>
 
             <!-- FAB móvil -->
-            <button id="mobileAddRecipeBtn" onclick="openManualRecipeModal()" class="absolute bg-gradient-to-tr from-blue-500 to-indigo-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-xl z-30 transition-all hidden" style="bottom: max(96px, calc(80px + env(safe-area-inset-bottom))); right: 20px">
-                <i class="fa-solid fa-plus text-xl"></i>
-            </button>
         </div>
     </div>
 </div>
@@ -727,12 +717,12 @@
         <div class="p-5 space-y-4 ios-scroll flex-1">
             <div class="p-3.5 bg-blue-50/50 dark:bg-blue-950/15 border border-blue-200/50 rounded-xl">
                 <p class="text-[0.8125rem] text-blue-800 dark:text-blue-300 leading-relaxed font-bold">
-                    <i class="fa-solid fa-circle-info mr-1"></i> Ingresa los datos abajo. Si añades un link de YouTube, el sistema rescatará el título original del video y el autor de manera automatizada.
+                    <i class="fa-solid fa-circle-info mr-1"></i> Pega un link de YouTube, TikTok o Instagram: el sistema intentará rescatar el título, el usuario/canal y, si la descripción incluye ingredientes, también los detectará automáticamente.
                 </p>
             </div>
             <div class="space-y-1">
                 <label class="text-[0.75rem] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Enlace del Video:</label>
-                <input type="url" id="importLinkInput" placeholder="Pega el enlace aquí..."
+                <input type="url" id="importLinkInput" placeholder="Pega el enlace de YouTube, TikTok o Instagram..."
                     class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 text-xs focus:outline-none focus:ring-0 glass-input text-slate-900 dark:text-white forced-light-input" style="min-height:44px">
             </div>
             <div class="space-y-1">
@@ -741,8 +731,8 @@
                     class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 text-xs focus:outline-none focus:ring-0 glass-input text-slate-900 dark:text-white forced-light-input" style="min-height:44px">
             </div>
             <div class="space-y-1">
-                <label class="text-[0.75rem] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Descripción o ingredientes copiados del video:</label>
-                <textarea id="importDescriptionInput" placeholder="Escribe o pega aquí la descripción de texto para que Gemini la estructure..." rows="5"
+                <label class="text-[0.75rem] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Descripción del video (opcional, recomendado en Instagram):</label>
+                <textarea id="importDescriptionInput" placeholder="Pega aquí la descripción/caption del video. Instagram no permite traerla automáticamente, así que si la pegas aquí, Gemini buscará los ingredientes en ese texto." rows="5"
                     class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 text-xs focus:outline-none focus:ring-0 glass-input text-slate-900 dark:text-white forced-light-input"></textarea>
             </div>
             <button onclick="processPastedDescriptionWithAI()" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3.5 px-4 rounded-xl font-extrabold flex items-center justify-center gap-2 text-sm shadow-md" style="min-height:48px">
@@ -955,6 +945,15 @@
         if (!url) return null;
         const m = url.match(/(?:youtu\.be\/|v\/|watch\?v=|&v=)([^#&?]{11})/);
         return m ? m[1] : null;
+    }
+
+    function detectPlatform(url) {
+        if (!url) return 'otro';
+        const u = url.toLowerCase();
+        if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+        if (u.includes('tiktok.com')) return 'tiktok';
+        if (u.includes('instagram.com')) return 'instagram';
+        return 'otro';
     }
 
     function showToast(msg, type = 'success') {
@@ -1644,6 +1643,45 @@
         return "";
     }
 
+    // Revisa una descripción/caption (de TikTok o Instagram) y extrae SOLO los ingredientes si están
+    // explícitamente escritos, sin inventar nada. Devuelve '' si no encuentra nada identificable.
+    async function extractIngredientsFromCaptionAI(captionText) {
+        if (!captionText || captionText.trim().length < 5) return '';
+        const apiKey = localStorage.getItem('gemini_api_key') || "";
+        if (!apiKey) return '';
+
+        try {
+            const sysPrompt = `Eres un asistente que revisa descripciones/captions de videos de redes sociales (TikTok, Instagram) en busca de una lista de ingredientes de una receta.
+Reglas estrictas:
+- NUNCA inventes, completes ni asumas ingredientes, cantidades o unidades que no estén escritos textualmente en el texto entregado.
+- Ignora hashtags, menciones, emojis decorativos y llamados a la acción (seguir, likear, comentar).
+- Extrae SOLO ingredientes, nunca pasos de preparación.
+- Si el texto no contiene una lista de ingredientes identificable con claridad, responde con un string vacío.
+Devuelve SOLAMENTE un objeto JSON válido, sin bloques de markdown ni texto adicional, con esta forma exacta:
+{ "ingredients": "ingrediente 1\\ningrediente 2\\ningrediente 3" }
+Si no hay ingredientes identificables, responde exactamente: { "ingredients": "" }`;
+
+            const payload = {
+                contents: [{ parts: [{ text: `Descripción del video:\n\n${captionText}` }] }],
+                systemInstruction: { parts: [{ text: sysPrompt }] },
+                generationConfig: { responseMimeType: "application/json" }
+            };
+
+            const raw = await callGeminiAPI(payload);
+            let parsed;
+            try {
+                parsed = JSON.parse(raw.trim());
+            } catch (jsonErr) {
+                const clean = raw.match(/\{[\s\S]*\}/);
+                parsed = clean ? JSON.parse(clean[0]) : null;
+            }
+            return (parsed && parsed.ingredients) ? normalizeNewlineString(parsed.ingredients) : '';
+        } catch (e) {
+            console.error('No se pudieron extraer ingredientes de la descripción:', e);
+            return '';
+        }
+    }
+
     // === IMPORTADOR LIMPIO: EVITA ALUCINACIONES Y DEJA LOS TEXTOS TOTALMENTE VACÍOS Y LISTOS PARA ESCRIBIR ===
     async function processPastedDescriptionWithAI() {
         const videoUrl = document.getElementById('importLinkInput').value.trim();
@@ -1661,23 +1699,47 @@
         progress.innerText = 'Buscando información del video...';
 
         try {
+            const platform = detectPlatform(videoUrl);
+            const ytId = getYouTubeId(videoUrl);
+
             let videoTitle = "";
             let videoAuthor = "";
-            const ytId = getYouTubeId(videoUrl);
-            if (videoUrl && ytId) {
-                progress.innerText = 'Obteniendo título original y canal de YouTube...';
-                const ytData = await fetchYouTubeTitleJSONP(videoUrl);
-                videoTitle = ytData.title;
-                videoAuthor = ytData.author;
+            let fetchedCaption = "";
+
+            if (videoUrl) {
+                progress.innerText = platform === 'youtube'
+                    ? 'Obteniendo título original y canal de YouTube...'
+                    : 'Buscando usuario y descripción del video...';
+                const oembedData = await fetchYouTubeTitleJSONP(videoUrl);
+                videoTitle = oembedData.title;
+                videoAuthor = oembedData.author;
+                // En TikTok, el campo "título" del oEmbed normalmente trae la descripción/caption completa del video
+                if (platform === 'tiktok') {
+                    fetchedCaption = oembedData.title || '';
+                }
             }
 
             if (!videoTitle && ytId) {
                 videoTitle = "Video de YouTube " + ytId;
+            } else if (!videoTitle && platform === 'tiktok') {
+                videoTitle = "Video de TikTok 🎵";
+            } else if (!videoTitle && platform === 'instagram') {
+                videoTitle = "Receta de Instagram 📸";
             } else if (!videoTitle) {
                 videoTitle = "Nueva Receta Importada 🍳";
             }
 
             const finalImage = customImage || (ytId ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : '');
+            const platformDefaultChannel = platform === 'tiktok' ? 'TikTok' : platform === 'instagram' ? 'Instagram' : 'YouTube';
+
+            // Ingredientes: solo se intenta extraer si hay algo de texto disponible (caption traída
+            // automáticamente de TikTok, o descripción pegada a mano por el usuario, útil sobre todo para Instagram)
+            const captionForIngredients = (userDesc || fetchedCaption || '').trim();
+            let extractedIngredients = '';
+            if (captionForIngredients) {
+                progress.innerText = 'Revisando la descripción en busca de ingredientes...';
+                extractedIngredients = await extractIngredientsFromCaptionAI(captionForIngredients);
+            }
 
             closeImportModal();
             loading.classList.add('hidden');
@@ -1687,17 +1749,20 @@
             
             document.getElementById('formTitle').value = videoTitle;
             document.getElementById('formCategory').value = 'Otros';
-            document.getElementById('formChannel').value = videoAuthor || 'YouTube';
+            document.getElementById('formChannel').value = videoAuthor || platformDefaultChannel;
             document.getElementById('formInstagramUrl').value = videoUrl;
             document.getElementById('formImageUrl').value = finalImage;
             
-            // Si el usuario ingresó notas en el cuadro, las colocamos. De lo contrario, queda limpio para evitar rellenos ficticios
-            document.getElementById('formIngredients').value = userDesc ? userDesc : '';
+            // Si Gemini logró identificar ingredientes reales en la descripción, los dejamos ya cargados.
+            // Si no, dejamos lo que el usuario haya escrito a mano (o vacío) para evitar inventar información.
+            document.getElementById('formIngredients').value = extractedIngredients || userDesc || '';
             document.getElementById('formInstructions').value = '';
 
             document.getElementById('recipeModal').classList.remove('hidden');
 
-            showToast("✨ Título y Canal cargados. Completa la receta a tu gusto.");
+            showToast(extractedIngredients
+                ? "✨ Título, canal e ingredientes detectados. Revisa la receta."
+                : "✨ Título y Canal cargados. Completa la receta a tu gusto.");
 
         } catch(e) {
             console.error(e);
