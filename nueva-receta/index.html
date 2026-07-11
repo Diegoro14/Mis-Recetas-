@@ -2326,11 +2326,34 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
         showToast('💾 Archivo Word generado');
     }
 
-    function downloadBackup() {
+    async function downloadBackup() {
+        const jsonStr = JSON.stringify(recipes, null, 2);
+        const fecha = new Date().toISOString().slice(0,10);
+        const fileName = `Mi_Recetario_Diego_${fecha}.json`;
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+
+        // En iPhone/PWA instalada, el Share Sheet nativo es el método confiable
+        try {
+            const file = new File([blob], fileName, { type: 'application/json' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: 'Respaldo de Recetario' });
+                showToast('💾 Copia de seguridad compartida');
+                return;
+            }
+        } catch (err) {
+            if (err && err.name === 'AbortError') { return; } // el usuario canceló el share sheet
+            // si falla el share, seguimos con el fallback de abajo
+        }
+
+        // Fallback (funciona bien en Safari/Chrome de escritorio y navegador normal en iOS)
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(recipes, null, 2));
-        a.download = 'Mi_Recetario_Diego_2026.json';
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
         showToast('💾 Copia de seguridad guardada');
     }
     
