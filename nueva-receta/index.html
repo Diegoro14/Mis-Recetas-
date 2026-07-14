@@ -931,7 +931,7 @@
                 <i class="fa-solid fa-microchip text-lg"></i>
                 <div class="flex-1">
                     <p class="font-bold text-sm">Escaneo local (Tesseract.js)</p>
-                    <p class="text-[0.7rem] opacity-90">Sin API Key · elige "Escanear Documentos" para mejor resultado</p>
+                    <p class="text-[0.7rem] opacity-90">Sin API Key · para mejor resultado, escanea antes en Notas/Archivos y elige la foto en Fototeca</p>
                 </div>
             </button>
         </div>
@@ -2415,14 +2415,27 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
     }
 
     function selectScanMethod(method) {
-        selectedScanMethod = method;
         closeScanOptionsMenu();
         if (method === 'tesseract') {
-            // Sin el atributo "capture" para que iOS muestre el menú completo
-            // (Tomar Foto, Fototeca, Examinar) incluyendo "Escanear Documentos",
-            // que recorta y mejora el contraste antes del OCR local.
-            document.getElementById('recipePhotoInputTesseract').click();
+            // Advertencia honesta: Tesseract.js es un OCR clásico entrenado con texto
+            // impreso. No reconoce bien letra manuscrita/cursiva sin importar la calidad
+            // de la foto — esa es una limitación del motor, no de la imagen. Para recetas
+            // a mano, Gemini (IA) es la opción que realmente funciona.
+            const seguirLocal = window.confirm(
+                '⚠️ El escaneo local (Tesseract.js) funciona bien con texto impreso o digital, ' +
+                'pero NO reconoce letra manuscrita/cursiva de forma confiable, sin importar qué tan ' +
+                'buena sea la foto — es una limitación del motor.\n\n' +
+                'Si tu receta está escrita a mano, te recomendamos usar el escaneo con Gemini (IA).\n\n' +
+                'Pulsa "Aceptar" para continuar con el escaneo local de todos modos, o "Cancelar" para usar Gemini.'
+            );
+            selectedScanMethod = seguirLocal ? 'tesseract' : 'gemini';
+            if (seguirLocal) {
+                document.getElementById('recipePhotoInputTesseract').click();
+            } else {
+                triggerRecipePhotoCapture();
+            }
         } else {
+            selectedScanMethod = method;
             triggerRecipePhotoCapture();
         }
     }
