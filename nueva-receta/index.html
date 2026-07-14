@@ -21,6 +21,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- Tesseract.js para OCR local (escaneo sin API Key) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <script>
         if (typeof tailwind !== "undefined") {
@@ -383,7 +385,7 @@
                             <i class="fa-solid fa-wand-magic-sparkles animate-pulse"></i>
                             Importar Receta
                         </button>
-                        <button onclick="triggerRecipePhotoCapture()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-2 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-xs">
+                        <button onclick="openScanMethodModal()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-2 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-xs">
                             <i class="fa-solid fa-camera"></i>
                             Importar Receta
                         </button>
@@ -836,6 +838,39 @@
 </div>
 
 <!-- CARGA IA -->
+<!-- SELECCIÓN DE MÉTODO DE ESCANEO -->
+<div id="scanMethodModal" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+    <div class="bg-white/90 dark:bg-slate-900/90 border border-white/20 dark:border-white/5 rounded-t-3xl md:rounded-3xl shadow-2xl w-full md:max-w-md flex flex-col max-h-[90%] overflow-hidden" style="padding-bottom:env(safe-area-inset-bottom)">
+        <div class="p-4 border-b border-white/10 flex items-center justify-between bg-white/20 dark:bg-black/10 flex-shrink-0">
+            <div class="flex items-center gap-2"><i class="fa-solid fa-camera text-emerald-500"></i><h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Escanear Receta desde Foto</h3></div>
+            <button onclick="closeScanMethodModal()" class="text-slate-400 p-2" style="min-height:40px;min-width:40px"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="p-5 space-y-3 ios-scroll flex-1">
+            <p class="text-[0.75rem] text-slate-500 dark:text-slate-400 leading-relaxed">Elige el motor de reconocimiento que deseas usar para transcribir tu receta desde la imagen.</p>
+
+            <button onclick="chooseScanMethod('gemini')" class="w-full flex items-start gap-4 p-4 bg-white/50 dark:bg-slate-800/50 border border-white/10 rounded-2xl shadow-sm hover:bg-white/80 dark:hover:bg-slate-800/80 active:scale-95 transition-all text-left" style="min-height:72px">
+                <div class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+                    <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+                </div>
+                <div class="flex-1">
+                    <h4 class="font-extrabold text-sm text-slate-800 dark:text-white">Escanear con Google IA</h4>
+                    <p class="text-[0.75rem] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">Usa Gemini Vision para leer la receta con precisión. Requiere API Key de Google configurada.</p>
+                </div>
+            </button>
+
+            <button onclick="chooseScanMethod('tesseract')" class="w-full flex items-start gap-4 p-4 bg-white/50 dark:bg-slate-800/50 border border-white/10 rounded-2xl shadow-sm hover:bg-white/80 dark:hover:bg-slate-800/80 active:scale-95 transition-all text-left" style="min-height:72px">
+                <div class="bg-gradient-to-br from-emerald-500 to-teal-600 text-white w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+                    <i class="fa-solid fa-microchip text-lg"></i>
+                </div>
+                <div class="flex-1">
+                    <h4 class="font-extrabold text-sm text-slate-800 dark:text-white">Escanear Local (Tesseract.js)</h4>
+                    <p class="text-[0.75rem] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">OCR 100% offline en tu navegador. No requiere API Key. La primera vez descarga el modelo de idioma.</p>
+                </div>
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="loadingModal" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4">
     <div class="text-center space-y-4">
         <div class="relative w-24 h-24 mx-auto">
@@ -845,7 +880,7 @@
                 <i class="fa-solid fa-utensils animate-pulse"></i>
             </div>
         </div>
-        <h3 class="text-white font-extrabold text-base">Procesando con Gemini IA...</h3>
+        <h3 id="loadingModalTitle" class="text-white font-extrabold text-base">Procesando con Gemini IA...</h3>
         <p id="loadingProgressText" class="text-slate-400 text-xs max-w-xs leading-relaxed">Buscando, estructurando y traduciendo la receta en formato profesional...</p>
     </div>
 </div>
@@ -2369,15 +2404,41 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
         reader.readAsText(file);
     }
 
-    // === ESCANEAR RECETA A MANO POR FOTO (Gemini Vision) ===
-    function triggerRecipePhotoCapture() {
-        const apiKey = localStorage.getItem('gemini_api_key') || "";
-        if (!apiKey) {
-            showToast('Primero configura tu API Key de Gemini en Configuración ⚙️', 'error');
-            openConfigModal();
-            return;
+    // === ESCANEAR RECETA A MANO POR FOTO (selector de método) ===
+    // 'gemini' (Google API) o 'tesseract' (OCR local)
+    let currentScanMode = 'gemini';
+
+    function openScanMethodModal() {
+        document.getElementById('scanMethodModal').classList.remove('hidden');
+    }
+
+    function closeScanMethodModal() {
+        document.getElementById('scanMethodModal').classList.add('hidden');
+    }
+
+    function chooseScanMethod(method) {
+        currentScanMode = method;
+        closeScanMethodModal();
+
+        if (method === 'gemini') {
+            const apiKey = localStorage.getItem('gemini_api_key') || "";
+            if (!apiKey) {
+                showToast('Primero configura tu API Key de Gemini en Configuración ⚙️', 'error');
+                openConfigModal();
+                return;
+            }
+        } else if (method === 'tesseract') {
+            if (typeof Tesseract === 'undefined') {
+                showToast('Cargando motor OCR local... reintenta en unos segundos.', 'error');
+                return;
+            }
         }
         document.getElementById('recipePhotoInput').click();
+    }
+
+    // Alias retrocompatible (por si se referencia en otros puntos)
+    function triggerRecipePhotoCapture() {
+        openScanMethodModal();
     }
 
     function fileToBase64(file) {
@@ -2389,15 +2450,56 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
         });
     }
 
+    function fileToDataURL(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function setLoadingUI(title, progressText) {
+        const titleEl = document.getElementById('loadingModalTitle');
+        const progressEl = document.getElementById('loadingProgressText');
+        if (titleEl) titleEl.innerText = title;
+        if (progressEl) progressEl.innerText = progressText;
+    }
+
+    // Aplica el resultado al formulario de receta, idéntico a como lo hace el flujo de Gemini.
+    function applyParsedRecipeToForm(parsed, successToast) {
+        document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
+        document.getElementById('editRecipeId').value = '';
+
+        document.getElementById('formTitle').value = parsed.title || 'Receta de Mamá 📝';
+        document.getElementById('formCategory').value = parsed.category || 'Otros';
+        document.getElementById('formChannel').value = parsed.channel || 'Recetario de Mamá';
+        document.getElementById('formInstagramUrl').value = '';
+        document.getElementById('formImageUrl').value = '';
+        document.getElementById('formIngredients').value = normalizeNewlineString(parsed.ingredients || '');
+        document.getElementById('formInstructions').value = normalizeNewlineString(parsed.instructions || '');
+
+        document.getElementById('recipeModal').classList.remove('hidden');
+        showToast(successToast);
+    }
+
     async function processRecipePhoto(event) {
         const file = event.target.files && event.target.files[0];
         event.target.value = '';
         if (!file) return;
 
+        if (currentScanMode === 'tesseract') {
+            await processRecipePhotoWithTesseract(file);
+        } else {
+            await processRecipePhotoWithGemini(file);
+        }
+    }
+
+    // === MOTOR GOOGLE (Gemini Vision) ===
+    async function processRecipePhotoWithGemini(file) {
         const loading = document.getElementById('loadingModal');
-        const progress = document.getElementById('loadingProgressText');
         loading.classList.remove('hidden');
-        progress.innerText = 'Leyendo la foto de la receta...';
+        setLoadingUI('Procesando con Gemini IA...', 'Leyendo la foto de la receta...');
 
         try {
             const base64Data = await fileToBase64(file);
@@ -2416,7 +2518,7 @@ Estructura JSON exacta:
 }
 Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo que sí se entienda y agrega " (revisar)" al final del título.`;
 
-            progress.innerText = 'Transcribiendo ingredientes y preparación...';
+            setLoadingUI('Procesando con Gemini IA...', 'Transcribiendo ingredientes y preparación...');
 
             const payload = {
                 contents: [{
@@ -2441,25 +2543,156 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
             if (!parsed) throw new Error("No se pudo leer la receta de la imagen.");
 
             loading.classList.add('hidden');
-
-            document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
-            document.getElementById('editRecipeId').value = '';
-
-            document.getElementById('formTitle').value = parsed.title || 'Receta de Mamá 📝';
-            document.getElementById('formCategory').value = parsed.category || 'Otros';
-            document.getElementById('formChannel').value = parsed.channel || 'Recetario de Mamá';
-            document.getElementById('formInstagramUrl').value = '';
-            document.getElementById('formImageUrl').value = '';
-            document.getElementById('formIngredients').value = normalizeNewlineString(parsed.ingredients || '');
-            document.getElementById('formInstructions').value = normalizeNewlineString(parsed.instructions || '');
-
-            document.getElementById('recipeModal').classList.remove('hidden');
-            showToast('📸 Receta transcrita. Revisa y guarda.');
+            applyParsedRecipeToForm(parsed, '📸 Receta transcrita. Revisa y guarda.');
 
         } catch (e) {
             console.error(e);
             loading.classList.add('hidden');
             showToast('No se pudo leer la foto. Prueba con más luz o revisa tu API Key.', 'error');
+        }
+    }
+
+    // === MOTOR LOCAL (Tesseract.js) ===
+    // Convierte el texto crudo del OCR en el mismo formato JSON que produce Gemini,
+    // para que el resto del flujo (formulario + saveRecipe) sea idéntico.
+    function parseOcrTextToRecipe(rawText) {
+        const lines = String(rawText || '')
+            .split(/\r?\n/)
+            .map(l => l.trim())
+            .filter(l => l.length > 0);
+
+        const empty = {
+            title: 'Receta Escaneada 📝',
+            category: 'Otros',
+            channel: 'Recetario de Mamá',
+            ingredients: '',
+            instructions: ''
+        };
+        if (lines.length === 0) return empty;
+
+        const ingredientMarkers = /^(ingredientes|ingredientes\s*\(.*?\)|ingredientes\s*para\s.*?)\s*:?\s*$/i;
+        const instructionMarkers = /^(preparaci[oó]n|instrucciones|pasos|elaboraci[oó]n|procedimiento|modo de preparaci[oó]n|c[oó]mo (se )?prepara(r)?|receta)\s*:?\s*$/i;
+        const categoryMarkers = /^\s*(categor[ií]a|tipo)\s*:\s*(.+)$/i;
+        const channelMarkers = /^\s*(autor|fuente|origen|receta de|de)\s*:\s*(.+)$/i;
+        const validCategories = ['Desayuno', 'Almuerzo', 'Postre', 'Trago', 'Otros'];
+
+        let title = '';
+        let category = 'Otros';
+        let channel = 'Recetario de Mamá';
+        let ingredients = [];
+        let instructions = [];
+        let preSectionLines = [];
+        let currentSection = null;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            if (ingredientMarkers.test(line)) { currentSection = 'ingredients'; continue; }
+            if (instructionMarkers.test(line)) { currentSection = 'instructions'; continue; }
+
+            const catMatch = line.match(categoryMarkers);
+            if (catMatch) {
+                const c = catMatch[2].trim().toLowerCase();
+                if (c.includes('desayuno')) category = 'Desayuno';
+                else if (c.includes('almuerzo') || c.includes('comida')) category = 'Almuerzo';
+                else if (c.includes('postre')) category = 'Postre';
+                else if (c.includes('trago') || c.includes('bebida') || c.includes('cocktail') || c.includes('coctel')) category = 'Trago';
+                else category = 'Otros';
+                continue;
+            }
+
+            const chMatch = line.match(channelMarkers);
+            if (chMatch) {
+                channel = chMatch[2].trim();
+                continue;
+            }
+
+            if (currentSection === 'ingredients') {
+                ingredients.push(line);
+            } else if (currentSection === 'instructions') {
+                instructions.push(line);
+            } else {
+                preSectionLines.push(line);
+            }
+        }
+
+        // Título: la primera línea previa a las secciones (o la primera línea del documento).
+        if (preSectionLines.length > 0) {
+            title = preSectionLines[0];
+            // Si sobran líneas previas y no detectamos ingredientes, las tomamos como ingredientes.
+            if (ingredients.length === 0 && instructions.length === 0 && preSectionLines.length > 1) {
+                ingredients = preSectionLines.slice(1);
+            }
+        } else {
+            title = lines[0];
+        }
+
+        if (!title) title = 'Receta Escaneada 📝';
+
+        // Asegurar emoji al final, igual que Gemini.
+        if (!/\p{Emoji}/u.test(title)) {
+            title = title + ' 📝';
+        }
+
+        return {
+            title: title,
+            category: validCategories.includes(category) ? category : 'Otros',
+            channel: channel || 'Recetario de Mamá',
+            ingredients: ingredients.join('\n'),
+            instructions: instructions.join('\n')
+        };
+    }
+
+    async function processRecipePhotoWithTesseract(file) {
+        const loading = document.getElementById('loadingModal');
+        loading.classList.remove('hidden');
+        setLoadingUI('Procesando con OCR Local...', 'Preparando imagen...');
+
+        try {
+            if (typeof Tesseract === 'undefined') {
+                throw new Error('Tesseract.js no está cargado. Verifica tu conexión y recarga la página.');
+            }
+
+            const dataUrl = await fileToDataURL(file);
+
+            setLoadingUI('Procesando con OCR Local...', 'Iniciando motor OCR (Tesseract.js)...');
+
+            const worker = await Tesseract.createWorker('spa', 1, {
+                logger: m => {
+                    if (!m) return;
+                    if (m.status === 'recognizing text') {
+                        const pct = Math.round((m.progress || 0) * 100);
+                        setLoadingUI('Procesando con OCR Local...', `Reconociendo texto... ${pct}%`);
+                    } else if (m.status === 'loading language traineddata') {
+                        const pct = Math.round((m.progress || 0) * 100);
+                        setLoadingUI('Procesando con OCR Local...', `Descargando modelo de idioma... ${pct}% (solo la primera vez)`);
+                    } else if (m.status === 'initializing tesseract' || m.status === 'initializing api') {
+                        setLoadingUI('Procesando con OCR Local...', 'Inicializando motor OCR...');
+                    } else if (m.status) {
+                        setLoadingUI('Procesando con OCR Local...', `OCR: ${m.status}...`);
+                    }
+                }
+            });
+
+            const { data } = await worker.recognize(dataUrl);
+            await worker.terminate();
+
+            const rawText = (data && data.text ? data.text : '').trim();
+            if (!rawText) {
+                throw new Error('No se detectó texto en la imagen.');
+            }
+
+            setLoadingUI('Procesando con OCR Local...', 'Estructurando receta reconocida...');
+
+            const parsed = parseOcrTextToRecipe(rawText);
+
+            loading.classList.add('hidden');
+            applyParsedRecipeToForm(parsed, '📸 Receta reconocida localmente. Revisa y guarda.');
+
+        } catch (e) {
+            console.error(e);
+            loading.classList.add('hidden');
+            showToast('No se pudo leer la foto con OCR local. Intenta con mejor luz o usa Google IA.', 'error');
         }
     }
 
@@ -2478,7 +2711,8 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         openChefChat, closeChefChat, sendChefChatMessage,
         analyzeNutritionAI, closeNutritionModal,
         openAdaptRecipe, closeAdaptRecipe, selectAdaptPreset, processAdaptRecipeAI, saveAdaptedAsNewRecipe,
-        triggerRecipePhotoCapture, processRecipePhoto
+        triggerRecipePhotoCapture, processRecipePhoto,
+        openScanMethodModal, closeScanMethodModal, chooseScanMethod
     });
 </script>
 </body>
