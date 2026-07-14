@@ -390,6 +390,7 @@
                         </button>
                     </div>
                     <input type="file" id="recipePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="processRecipePhoto(event)">
+                    <input type="file" id="recipePhotoInputTesseract" accept="image/*" class="hidden" onchange="processRecipePhoto(event)">
                 </div>
 
                 <!-- Lista de recetas -->
@@ -930,7 +931,7 @@
                 <i class="fa-solid fa-microchip text-lg"></i>
                 <div class="flex-1">
                     <p class="font-bold text-sm">Escaneo local (Tesseract.js)</p>
-                    <p class="text-[0.7rem] opacity-90">Sin API Key · funciona sin conexión</p>
+                    <p class="text-[0.7rem] opacity-90">Sin API Key · elige "Escanear Documentos" para mejor resultado</p>
                 </div>
             </button>
         </div>
@@ -2417,8 +2418,10 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
         selectedScanMethod = method;
         closeScanOptionsMenu();
         if (method === 'tesseract') {
-            // El escaneo local no requiere API Key, se abre directo la cámara/galería.
-            document.getElementById('recipePhotoInput').click();
+            // Sin el atributo "capture" para que iOS muestre el menú completo
+            // (Tomar Foto, Fototeca, Examinar) incluyendo "Escanear Documentos",
+            // que recorta y mejora el contraste antes del OCR local.
+            document.getElementById('recipePhotoInputTesseract').click();
         } else {
             triggerRecipePhotoCapture();
         }
