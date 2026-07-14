@@ -20,9 +20,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
-    <!-- Tesseract.js para OCR local (escaneo sin API Key) -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <script>
         if (typeof tailwind !== "undefined") {
@@ -100,7 +99,7 @@
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.95) !important;
         }
-        .dark #recipeModal, .dark #importModal, .dark #chefChatModal, .dark #nutritionModal, .dark #adaptModal, .dark #configModal, .dark #backupModal, .dark #deleteConfirmModal {
+        .dark #recipeModal, .dark #importModal, .dark #chefChatModal, .dark #nutritionModal, .dark #adaptModal, .dark #configModal, .dark #backupModal, .dark #deleteConfirmModal, .dark #scanOptionsModal {
             background-color: rgba(0, 0, 0, 0.9) !important;
             backdrop-filter: blur(15px) !important;
             -webkit-backdrop-filter: blur(15px) !important;
@@ -385,9 +384,9 @@
                             <i class="fa-solid fa-wand-magic-sparkles animate-pulse"></i>
                             Importar Receta
                         </button>
-                        <button onclick="openScanMethodModal()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-2 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-xs">
+                        <button onclick="openScanOptionsMenu()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-2 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-xs">
                             <i class="fa-solid fa-camera"></i>
-                            Escanear Receta
+                            Importar Receta
                         </button>
                     </div>
                     <input type="file" id="recipePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="processRecipePhoto(event)">
@@ -838,39 +837,6 @@
 </div>
 
 <!-- CARGA IA -->
-<!-- SELECCIÓN DE MÉTODO DE ESCANEO -->
-<div id="scanMethodModal" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-    <div class="bg-white/90 dark:bg-slate-900/90 border border-white/20 dark:border-white/5 rounded-t-3xl md:rounded-3xl shadow-2xl w-full md:max-w-md flex flex-col max-h-[90%] overflow-hidden" style="padding-bottom:env(safe-area-inset-bottom)">
-        <div class="p-4 border-b border-white/10 flex items-center justify-between bg-white/20 dark:bg-black/10 flex-shrink-0">
-            <div class="flex items-center gap-2"><i class="fa-solid fa-camera text-emerald-500"></i><h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Escanear Receta desde Foto</h3></div>
-            <button onclick="closeScanMethodModal()" class="text-slate-400 p-2" style="min-height:40px;min-width:40px"><i class="fa-solid fa-xmark text-lg"></i></button>
-        </div>
-        <div class="p-5 space-y-3 ios-scroll flex-1">
-            <p class="text-[0.75rem] text-slate-500 dark:text-slate-400 leading-relaxed">Elige el motor de reconocimiento que deseas usar para transcribir tu receta desde la imagen.</p>
-
-            <button onclick="chooseScanMethod('gemini')" class="w-full flex items-start gap-4 p-4 bg-white/50 dark:bg-slate-800/50 border border-white/10 rounded-2xl shadow-sm hover:bg-white/80 dark:hover:bg-slate-800/80 active:scale-95 transition-all text-left" style="min-height:72px">
-                <div class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
-                    <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
-                </div>
-                <div class="flex-1">
-                    <h4 class="font-extrabold text-sm text-slate-800 dark:text-white">Escanear con Google IA</h4>
-                    <p class="text-[0.75rem] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">Usa Gemini Vision para leer la receta con precisión. Requiere API Key de Google configurada.</p>
-                </div>
-            </button>
-
-            <button onclick="chooseScanMethod('tesseract')" class="w-full flex items-start gap-4 p-4 bg-white/50 dark:bg-slate-800/50 border border-white/10 rounded-2xl shadow-sm hover:bg-white/80 dark:hover:bg-slate-800/80 active:scale-95 transition-all text-left" style="min-height:72px">
-                <div class="bg-gradient-to-br from-emerald-500 to-teal-600 text-white w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
-                    <i class="fa-solid fa-microchip text-lg"></i>
-                </div>
-                <div class="flex-1">
-                    <h4 class="font-extrabold text-sm text-slate-800 dark:text-white">Escanear Local (Tesseract.js)</h4>
-                    <p class="text-[0.75rem] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">OCR 100% offline. No requiere API Key. Funciona mejor con <strong>recetas impresas</strong>; en texto manuscrito puede fallar. Si la calidad es baja, se ofrece reintento con Google IA.</p>
-                </div>
-            </button>
-        </div>
-    </div>
-</div>
-
 <div id="loadingModal" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4">
     <div class="text-center space-y-4">
         <div class="relative w-24 h-24 mx-auto">
@@ -880,7 +846,7 @@
                 <i class="fa-solid fa-utensils animate-pulse"></i>
             </div>
         </div>
-        <h3 id="loadingModalTitle" class="text-white font-extrabold text-base">Procesando con Gemini IA...</h3>
+        <h3 class="text-white font-extrabold text-base">Procesando con Gemini IA...</h3>
         <p id="loadingProgressText" class="text-slate-400 text-xs max-w-xs leading-relaxed">Buscando, estructurando y traduciendo la receta en formato profesional...</p>
     </div>
 </div>
@@ -935,6 +901,38 @@
                 <button onclick="closeDeleteConfirmModal()" class="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold" style="min-height:44px">Cancelar</button>
                 <button id="confirmDeleteBtn" class="px-5 py-2.5 bg-red-600 text-white rounded-xl text-xs font-bold shadow-md" style="min-height:44px">Eliminar</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- MENÚ DE OPCIONES DE ESCANEO -->
+<div id="scanOptionsModal" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-end md:items-center justify-center p-0 md:p-4" onclick="if(event.target === this) closeScanOptionsMenu()">
+    <div class="bg-white dark:bg-slate-900 rounded-t-3xl md:rounded-3xl shadow-2xl max-w-sm w-full border border-white/10">
+        <div class="p-5 border-b border-white/10 flex items-center justify-between">
+            <div class="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+                <i class="fa-solid fa-camera text-xl"></i>
+                <h3 class="font-extrabold text-base text-slate-800 dark:text-slate-100">Escanear Receta</h3>
+            </div>
+            <button onclick="closeScanOptionsMenu()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 w-8 h-8 flex items-center justify-center">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="p-5 space-y-3">
+            <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Elige cómo quieres transcribir la foto de tu receta.</p>
+            <button onclick="selectScanMethod('gemini')" class="w-full flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-blue-500 via-indigo-500 to-sky-500 text-white text-left transition-all active:scale-95 shadow-md" style="min-height:44px">
+                <i class="fa-solid fa-cloud text-lg"></i>
+                <div class="flex-1">
+                    <p class="font-bold text-sm">Escaneo con Google (Gemini)</p>
+                    <p class="text-[0.7rem] opacity-90">Más preciso · requiere API Key e internet</p>
+                </div>
+            </button>
+            <button onclick="selectScanMethod('tesseract')" class="w-full flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-left transition-all active:scale-95 shadow-md" style="min-height:44px">
+                <i class="fa-solid fa-microchip text-lg"></i>
+                <div class="flex-1">
+                    <p class="font-bold text-sm">Escaneo local (Tesseract.js)</p>
+                    <p class="text-[0.7rem] opacity-90">Sin API Key · funciona sin conexión</p>
+                </div>
+            </button>
         </div>
     </div>
 </div>
@@ -2404,41 +2402,36 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
         reader.readAsText(file);
     }
 
-    // === ESCANEAR RECETA A MANO POR FOTO (selector de método) ===
-    // 'gemini' (Google API) o 'tesseract' (OCR local)
-    let currentScanMode = 'gemini';
+    // === ESCANEAR RECETA A MANO POR FOTO (menú: Gemini Vision o Tesseract.js local) ===
+    let selectedScanMethod = 'gemini';
 
-    function openScanMethodModal() {
-        document.getElementById('scanMethodModal').classList.remove('hidden');
+    function openScanOptionsMenu() {
+        document.getElementById('scanOptionsModal').classList.remove('hidden');
     }
 
-    function closeScanMethodModal() {
-        document.getElementById('scanMethodModal').classList.add('hidden');
+    function closeScanOptionsMenu() {
+        document.getElementById('scanOptionsModal').classList.add('hidden');
     }
 
-    function chooseScanMethod(method) {
-        currentScanMode = method;
-        closeScanMethodModal();
+    function selectScanMethod(method) {
+        selectedScanMethod = method;
+        closeScanOptionsMenu();
+        if (method === 'tesseract') {
+            // El escaneo local no requiere API Key, se abre directo la cámara/galería.
+            document.getElementById('recipePhotoInput').click();
+        } else {
+            triggerRecipePhotoCapture();
+        }
+    }
 
-        if (method === 'gemini') {
-            const apiKey = localStorage.getItem('gemini_api_key') || "";
-            if (!apiKey) {
-                showToast('Primero configura tu API Key de Gemini en Configuración ⚙️', 'error');
-                openConfigModal();
-                return;
-            }
-        } else if (method === 'tesseract') {
-            if (typeof Tesseract === 'undefined') {
-                showToast('Cargando motor OCR local... reintenta en unos segundos.', 'error');
-                return;
-            }
+    function triggerRecipePhotoCapture() {
+        const apiKey = localStorage.getItem('gemini_api_key') || "";
+        if (!apiKey) {
+            showToast('Primero configura tu API Key de Gemini en Configuración ⚙️', 'error');
+            openConfigModal();
+            return;
         }
         document.getElementById('recipePhotoInput').click();
-    }
-
-    // Alias retrocompatible (por si se referencia en otros puntos)
-    function triggerRecipePhotoCapture() {
-        openScanMethodModal();
     }
 
     function fileToBase64(file) {
@@ -2450,56 +2443,24 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
         });
     }
 
-    function fileToDataURL(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result));
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    }
-
-    function setLoadingUI(title, progressText) {
-        const titleEl = document.getElementById('loadingModalTitle');
-        const progressEl = document.getElementById('loadingProgressText');
-        if (titleEl) titleEl.innerText = title;
-        if (progressEl) progressEl.innerText = progressText;
-    }
-
-    // Aplica el resultado al formulario de receta, idéntico a como lo hace el flujo de Gemini.
-    function applyParsedRecipeToForm(parsed, successToast) {
-        document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
-        document.getElementById('editRecipeId').value = '';
-
-        document.getElementById('formTitle').value = parsed.title || 'Receta de Mamá 📝';
-        document.getElementById('formCategory').value = parsed.category || 'Otros';
-        document.getElementById('formChannel').value = parsed.channel || 'Recetario de Mamá';
-        document.getElementById('formInstagramUrl').value = '';
-        document.getElementById('formImageUrl').value = '';
-        document.getElementById('formIngredients').value = normalizeNewlineString(parsed.ingredients || '');
-        document.getElementById('formInstructions').value = normalizeNewlineString(parsed.instructions || '');
-
-        document.getElementById('recipeModal').classList.remove('hidden');
-        showToast(successToast);
-    }
-
     async function processRecipePhoto(event) {
         const file = event.target.files && event.target.files[0];
         event.target.value = '';
         if (!file) return;
 
-        if (currentScanMode === 'tesseract') {
-            await processRecipePhotoWithTesseract(file);
+        if (selectedScanMethod === 'tesseract') {
+            await processRecipePhotoTesseract(file);
         } else {
-            await processRecipePhotoWithGemini(file);
+            await processRecipePhotoGemini(file);
         }
     }
 
-    // === MOTOR GOOGLE (Gemini Vision) ===
-    async function processRecipePhotoWithGemini(file) {
+    // --- Motor 1: Escaneo con Gemini Vision (API de Google) ---
+    async function processRecipePhotoGemini(file) {
         const loading = document.getElementById('loadingModal');
+        const progress = document.getElementById('loadingProgressText');
         loading.classList.remove('hidden');
-        setLoadingUI('Procesando con Gemini IA...', 'Leyendo la foto de la receta...');
+        progress.innerText = 'Leyendo la foto de la receta...';
 
         try {
             const base64Data = await fileToBase64(file);
@@ -2518,7 +2479,7 @@ Estructura JSON exacta:
 }
 Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo que sí se entienda y agrega " (revisar)" al final del título.`;
 
-            setLoadingUI('Procesando con Gemini IA...', 'Transcribiendo ingredientes y preparación...');
+            progress.innerText = 'Transcribiendo ingredientes y preparación...';
 
             const payload = {
                 contents: [{
@@ -2543,7 +2504,20 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
             if (!parsed) throw new Error("No se pudo leer la receta de la imagen.");
 
             loading.classList.add('hidden');
-            applyParsedRecipeToForm(parsed, '📸 Receta transcrita. Revisa y guarda.');
+
+            document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
+            document.getElementById('editRecipeId').value = '';
+
+            document.getElementById('formTitle').value = parsed.title || 'Receta de Mamá 📝';
+            document.getElementById('formCategory').value = parsed.category || 'Otros';
+            document.getElementById('formChannel').value = parsed.channel || 'Recetario de Mamá';
+            document.getElementById('formInstagramUrl').value = '';
+            document.getElementById('formImageUrl').value = '';
+            document.getElementById('formIngredients').value = normalizeNewlineString(parsed.ingredients || '');
+            document.getElementById('formInstructions').value = normalizeNewlineString(parsed.instructions || '');
+
+            document.getElementById('recipeModal').classList.remove('hidden');
+            showToast('📸 Receta transcrita. Revisa y guarda.');
 
         } catch (e) {
             console.error(e);
@@ -2552,341 +2526,117 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         }
     }
 
-    // === MOTOR LOCAL (Tesseract.js) ===
-    // Convierte el texto crudo del OCR en el mismo formato JSON que produce Gemini,
-    // para que el resto del flujo (formulario + saveRecipe) sea idéntico.
-    function parseOcrTextToRecipe(rawText) {
-        const lines = String(rawText || '')
-            .split(/\r?\n/)
-            .map(l => l.trim())
-            .filter(l => l.length > 0);
-
-        const empty = {
-            title: 'Receta Escaneada 📝',
-            category: 'Otros',
-            channel: 'Recetario de Mamá',
-            ingredients: '',
-            instructions: ''
-        };
-        if (lines.length === 0) return empty;
-
-        const ingredientMarkers = /^(ingredientes|ingredientes\s*\(.*?\)|ingredientes\s*para\s.*?)\s*:?\s*$/i;
-        const instructionMarkers = /^(preparaci[oó]n|instrucciones|pasos|elaboraci[oó]n|procedimiento|modo de preparaci[oó]n|c[oó]mo (se )?prepara(r)?|receta)\s*:?\s*$/i;
-        const categoryMarkers = /^\s*(categor[ií]a|tipo)\s*:\s*(.+)$/i;
-        const channelMarkers = /^\s*(autor|fuente|origen|receta de|de)\s*:\s*(.+)$/i;
-        const validCategories = ['Desayuno', 'Almuerzo', 'Postre', 'Trago', 'Otros'];
-
-        let title = '';
-        let category = 'Otros';
-        let channel = 'Recetario de Mamá';
-        let ingredients = [];
-        let instructions = [];
-        let preSectionLines = [];
-        let currentSection = null;
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-
-            if (ingredientMarkers.test(line)) { currentSection = 'ingredients'; continue; }
-            if (instructionMarkers.test(line)) { currentSection = 'instructions'; continue; }
-
-            const catMatch = line.match(categoryMarkers);
-            if (catMatch) {
-                const c = catMatch[2].trim().toLowerCase();
-                if (c.includes('desayuno')) category = 'Desayuno';
-                else if (c.includes('almuerzo') || c.includes('comida')) category = 'Almuerzo';
-                else if (c.includes('postre')) category = 'Postre';
-                else if (c.includes('trago') || c.includes('bebida') || c.includes('cocktail') || c.includes('coctel')) category = 'Trago';
-                else category = 'Otros';
-                continue;
-            }
-
-            const chMatch = line.match(channelMarkers);
-            if (chMatch) {
-                channel = chMatch[2].trim();
-                continue;
-            }
-
-            if (currentSection === 'ingredients') {
-                ingredients.push(line);
-            } else if (currentSection === 'instructions') {
-                instructions.push(line);
-            } else {
-                preSectionLines.push(line);
-            }
-        }
-
-        // Título: la primera línea previa a las secciones (o la primera línea del documento).
-        if (preSectionLines.length > 0) {
-            title = preSectionLines[0];
-            // Si sobran líneas previas y no detectamos ingredientes, las tomamos como ingredientes.
-            if (ingredients.length === 0 && instructions.length === 0 && preSectionLines.length > 1) {
-                ingredients = preSectionLines.slice(1);
-            }
-        } else {
-            title = lines[0];
-        }
-
-        if (!title) title = 'Receta Escaneada 📝';
-
-        // Asegurar emoji al final, igual que Gemini.
-        if (!/\p{Emoji}/u.test(title)) {
-            title = title + ' 📝';
-        }
-
-        return {
-            title: title,
-            category: validCategories.includes(category) ? category : 'Otros',
-            channel: channel || 'Recetario de Mamá',
-            ingredients: ingredients.join('\n'),
-            instructions: instructions.join('\n')
-        };
-    }
-
-    // === MOTOR LOCAL (Tesseract.js) - con preprocesamiento de imagen ===
-    //
-    // Pipeline:
-    //   1. Cargar imagen a canvas
-    //   2. Convertir a escala de grises
-    //   3. Auto-contrast (estirar histograma)
-    //   4. Upscale 2x si la imagen es pequeña (textos finos se reconocen mejor)
-    //   5. Nitidez (sharpen) para reforzar bordes de letras
-    //   6. Binarización Otsu (texto negro sobre blanco puro)
-    //   7. Tesseract con lang=spa+eng, PSM 6 (bloque uniforme), OEM 1 (LSTM)
-    //   8. Quality check: si el texto tiene >25% de caracteres basura,
-    //      se avisa al usuario y se ofrece reintento con Google IA.
-    //
-    async function processRecipePhotoWithTesseract(file) {
+    // --- Motor 2: Escaneo 100% local con Tesseract.js (sin API Key, funciona sin internet) ---
+    async function processRecipePhotoTesseract(file) {
         const loading = document.getElementById('loadingModal');
+        const progress = document.getElementById('loadingProgressText');
         loading.classList.remove('hidden');
-        setLoadingUI('Procesando con OCR Local...', 'Preparando imagen...');
+        progress.innerText = 'Escaneando localmente con Tesseract.js...';
 
         try {
             if (typeof Tesseract === 'undefined') {
-                throw new Error('Tesseract.js no está cargado. Verifica tu conexión y recarga la página.');
+                throw new Error('No se pudo cargar el motor de escaneo local (Tesseract.js).');
             }
 
-            // --- 1. PREPROCESAMIENTO DE IMAGEN ---
-            const processedDataUrl = await preprocessImageForOCR(file);
-
-            setLoadingUI('Procesando con OCR Local...', 'Iniciando motor OCR (Tesseract.js)...');
-
-            // --- 2. CONFIGURAR TESSERACT ---
-            // spa+eng: español como idioma principal, inglés como apoyo (marca, unidades, etc.)
-            // OEM 1   = solo LSTM (mejor precisión moderna)
-            const worker = await Tesseract.createWorker(['spa', 'eng'], 1, {
-                logger: m => {
-                    if (!m) return;
-                    if (m.status === 'recognizing text') {
-                        const pct = Math.round((m.progress || 0) * 100);
-                        setLoadingUI('Procesando con OCR Local...', `Reconociendo texto... ${pct}%`);
-                    } else if (m.status === 'loading language traineddata' || m.status === 'loading language traineddata (from cache)') {
-                        const pct = Math.round((m.progress || 0) * 100);
-                        setLoadingUI('Procesando con OCR Local...', `Cargando modelo de idioma... ${pct}% (solo la primera vez)`);
-                    } else if (m.status === 'initializing tesseract' || m.status === 'initializing api') {
-                        setLoadingUI('Procesando con OCR Local...', 'Inicializando motor OCR...');
+            const { data: { text } } = await Tesseract.recognize(file, 'spa', {
+                logger: (m) => {
+                    if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+                        progress.innerText = `Reconociendo texto local... ${Math.round(m.progress * 100)}%`;
                     } else if (m.status) {
-                        setLoadingUI('Procesando con OCR Local...', `OCR: ${m.status}...`);
+                        progress.innerText = 'Preparando el motor local...';
                     }
                 }
             });
 
-            // PSM 6 = la imagen es un solo bloque uniforme de texto (típico en recetas)
-            // preserve_interword_spaces = 1 conserva los espacios entre palabras
-            await worker.setParameters({
-                tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
-                preserve_interword_spaces: '1',
-            });
+            if (!text || !text.trim()) throw new Error('No se detectó texto legible en la imagen.');
 
-            // --- 3. RECONOCIMIENTO ---
-            const { data } = await worker.recognize(processedDataUrl);
-            await worker.terminate();
-
-            const rawText = (data && data.text ? data.text : '').trim();
-            if (!rawText) {
-                throw new Error('No se detectó texto en la imagen. Prueba con mejor luz, acerca la cámara o usa Google IA.');
-            }
-
-            setLoadingUI('Procesando con OCR Local...', 'Estructurando receta reconocida...');
-
-            const parsed = parseOcrTextToRecipe(rawText);
-
-            // --- 4. CHEQUEO DE CALIDAD ---
-            const quality = assessOcrQuality(rawText, parsed);
-            if (quality.isGarbage) {
-                loading.classList.add('hidden');
-                console.warn('OCR de baja calidad detectado.', { quality, rawText });
-                const hasGeminiKey = !!(localStorage.getItem('gemini_api_key') || '');
-                const msg = hasGeminiKey
-                    ? `El OCR local dio texto ilegible (calidad ${quality.score}%). ¿Reintentar con Google IA?`
-                    : `El OCR local dio texto ilegible (calidad ${quality.score}%). Configura tu API Key de Gemini en ⚙️ para mejor precisión, o reescanea con más luz y la cámara más cerca.`;
-                if (hasGeminiKey && confirm(msg)) {
-                    // Reintento automático con Gemini
-                    currentScanMode = 'gemini';
-                    await processRecipePhotoWithGemini(file);
-                } else {
-                    showToast(msg, 'error');
-                    // Aun así abrimos el formulario para que el usuario corrija a mano
-                    applyParsedRecipeToForm(parsed, '⚠️ OCR de baja calidad. Revisa a mano antes de guardar.');
-                }
-                return;
-            }
+            // Normalizamos el texto crudo del OCR al mismo esquema que usa el motor de Gemini:
+            // title, category, channel, ingredients, instructions.
+            const parsed = parseOcrTextToRecipeStructure(text);
 
             loading.classList.add('hidden');
-            applyParsedRecipeToForm(parsed, `📸 Receta reconocida localmente (calidad ${quality.score}%). Revisa y guarda.`);
+
+            document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
+            document.getElementById('editRecipeId').value = '';
+
+            document.getElementById('formTitle').value = parsed.title;
+            document.getElementById('formCategory').value = parsed.category;
+            document.getElementById('formChannel').value = parsed.channel;
+            document.getElementById('formInstagramUrl').value = '';
+            document.getElementById('formImageUrl').value = '';
+            document.getElementById('formIngredients').value = normalizeNewlineString(parsed.ingredients);
+            document.getElementById('formInstructions').value = normalizeNewlineString(parsed.instructions);
+
+            document.getElementById('recipeModal').classList.remove('hidden');
+            showToast('📸 Receta escaneada localmente. Revisa y ajusta los campos.');
 
         } catch (e) {
             console.error(e);
             loading.classList.add('hidden');
-            showToast('No se pudo leer la foto con OCR local. Intenta con mejor luz o usa Google IA.', 'error');
+            showToast('No se pudo escanear la foto localmente. Prueba con más luz o un texto más claro.', 'error');
         }
     }
 
-    // Carga un File/Blob en un HTMLImageElement
-    function loadImageElement(file) {
-        return new Promise((resolve, reject) => {
-            const url = URL.createObjectURL(file);
-            const img = new Image();
-            img.onload = () => { resolve(img); };
-            img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
-            img.src = url;
-        });
-    }
+    // Heurística local (sin IA) para separar título / ingredientes / instrucciones
+    // a partir del texto crudo que entrega Tesseract.js, respetando la misma
+    // estructura de datos que produce el motor de Gemini Vision.
+    function parseOcrTextToRecipeStructure(rawText) {
+        const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
 
-    // Preprocesa la imagen del File para que Tesseract la lea mejor.
-    // Devuelve un dataURL PNG en blanco y negro, optimizado para OCR.
-    async function preprocessImageForOCR(file) {
-        const img = await loadImageElement(file);
-
-        // Upscale si la imagen es pequeña (texto fino se reconoce mejor a >=1500px lado largo)
-        const maxSide = Math.max(img.width, img.height);
-        let scale = 1;
-        if (maxSide < 1500) scale = 2;
-        if (maxSide < 800)  scale = 3;
-
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, w, h);
-
-        const imageData = ctx.getImageData(0, 0, w, h);
-        const d = imageData.data;
-
-        // --- Paso 1: escala de grises (luminancia perceptual) ---
-        const gray = new Uint8ClampedArray(w * h);
-        for (let i = 0, j = 0; i < d.length; i += 4, j++) {
-            // Recortamos el fondo blanco: si un pixel es casi blanco, lo forzamos a blanco.
-            const r = d[i], g = d[i+1], b = d[i+2];
-            let y = (0.299 * r + 0.587 * g + 0.114 * b) | 0;
-            gray[j] = y;
+        if (lines.length === 0) {
+            return {
+                title: 'Receta escaneada (revisar) 📝',
+                category: 'Otros',
+                channel: 'Recetario de Mamá (OCR local)',
+                ingredients: '',
+                instructions: ''
+            };
         }
 
-        // --- Paso 2: auto-contraste (estirar histograma al rango 0-255) ---
-        let min = 255, max = 0;
-        for (let i = 0; i < gray.length; i++) {
-            const v = gray[i];
-            if (v < min) min = v;
-            if (v > max) max = v;
-        }
-        const range = Math.max(1, max - min);
-        for (let i = 0; i < gray.length; i++) {
-            gray[i] = ((gray[i] - min) * 255 / range) | 0;
-        }
+        const ingredientsRegex = /^(ingredientes?|para la receta|necesitas|lista de ingredientes)\s*:?$/i;
+        const instructionsRegex = /^(instrucciones?|preparaci[oó]n|pasos?|modo de preparaci[oó]n|elaboraci[oó]n|procedimiento)\s*:?$/i;
+        const measureRegex = /^[-•*]?\s*[\d½¼¾⅓⅔.,\/\s]*\s*(g|gr|gramos|kg|ml|l|lt|litro|tz|taza|tazas|cda|cdas|cdta|cdtas|cucharada|cucharadas|cucharadita|cucharaditas|unidad|unidades|pizca|diente|dientes)\b/i;
 
-        // --- Paso 3: boost de contraste (factor 1.4) ---
-        const contrast = 1.4;
-        const cFactor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
-        for (let i = 0; i < gray.length; i++) {
-            let v = cFactor * (gray[i] - 128) + 128;
-            if (v < 0) v = 0; else if (v > 255) v = 255;
-            gray[i] = v | 0;
-        }
+        let ingredientsIdx = lines.findIndex(l => ingredientsRegex.test(l));
+        let instructionsIdx = lines.findIndex(l => instructionsRegex.test(l));
 
-        // --- Paso 4: nitidez (filtro 3x3 sharpen) ---
-        // Aplicamos convolución simple; grayIn -> grayOut
-        const sharpened = new Uint8ClampedArray(w * h);
-        const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
-        for (let y = 0; y < h; y++) {
-            for (let x = 0; x < w; x++) {
-                let acc = 0;
-                for (let ky = -1; ky <= 1; ky++) {
-                    for (let kx = -1; kx <= 1; kx++) {
-                        const sx = Math.min(w - 1, Math.max(0, x + kx));
-                        const sy = Math.min(h - 1, Math.max(0, y + ky));
-                        const k = kernel[(ky + 1) * 3 + (kx + 1)];
-                        acc += gray[sy * w + sx] * k;
-                    }
-                }
-                if (acc < 0) acc = 0; else if (acc > 255) acc = 255;
-                sharpened[y * w + x] = acc | 0;
+        let title = '';
+        let ingredientsLines = [];
+        let instructionsLines = [];
+
+        if (ingredientsIdx > -1) {
+            title = lines.slice(0, ingredientsIdx).join(' ');
+            const ingredientsStart = ingredientsIdx + 1;
+            const ingredientsEnd = instructionsIdx > ingredientsIdx ? instructionsIdx : lines.length;
+            ingredientsLines = lines.slice(ingredientsStart, ingredientsEnd);
+            instructionsLines = instructionsIdx > ingredientsIdx ? lines.slice(instructionsIdx + 1) : [];
+        } else if (instructionsIdx > -1) {
+            title = lines.slice(0, instructionsIdx > 0 ? 1 : 0).join(' ') || lines[0];
+            ingredientsLines = lines.slice(1, instructionsIdx);
+            instructionsLines = lines.slice(instructionsIdx + 1);
+        } else {
+            // Sin encabezados claros: usamos la primera línea como título y clasificamos
+            // el resto por patrones típicos de medidas/ingredientes vs. texto de pasos.
+            title = lines[0];
+            const rest = lines.slice(1);
+            rest.forEach(l => {
+                if (measureRegex.test(l) || /^[-•*]/.test(l)) ingredientsLines.push(l);
+                else instructionsLines.push(l);
+            });
+            if (instructionsLines.length === 0 && ingredientsLines.length > 1) {
+                instructionsLines = ingredientsLines.splice(Math.ceil(ingredientsLines.length / 2));
             }
         }
 
-        // --- Paso 5: binarización Otsu ---
-        const hist = new Array(256).fill(0);
-        for (let i = 0; i < sharpened.length; i++) hist[sharpened[i]]++;
-        const total = sharpened.length;
-        let sumTotal = 0;
-        for (let i = 0; i < 256; i++) sumTotal += i * hist[i];
-        let sumB = 0, wB = 0, maxVar = -1, threshold = 128;
-        for (let i = 0; i < 256; i++) {
-            wB += hist[i];
-            if (wB === 0) continue;
-            const wF = total - wB;
-            if (wF === 0) break;
-            sumB += i * hist[i];
-            const mB = sumB / wB;
-            const mF = (sumTotal - sumB) / wF;
-            const between = wB * wF * (mB - mF) * (mB - mF);
-            if (between > maxVar) {
-                maxVar = between;
-                threshold = i;
-            }
-        }
+        const cleanTitle = (title || 'Receta escaneada').replace(/^[-•*\d.\s]+/, '').trim();
 
-        // --- Paso 6: escribir resultado binarizado en el canvas ---
-        for (let i = 0, j = 0; i < d.length; i += 4, j++) {
-            const v = sharpened[j] > threshold ? 255 : 0;
-            d[i] = d[i+1] = d[i+2] = v;
-            // d[i+3] (alpha) queda igual
-        }
-        ctx.putImageData(imageData, 0, 0);
-
-        return canvas.toDataURL('image/png');
-    }
-
-    // Heurística para detectar si el OCR produjo texto ilegible (garbage).
-    // Devuelve { score: 0-100, isGarbage: bool }.
-    // score = porcentaje de "caracteres buenos" (letras, números, signos comunes en español).
-    function assessOcrQuality(rawText, parsed) {
-        const text = String(rawText || '');
-        if (text.length < 5) return { score: 0, isGarbage: true };
-
-        // Caracteres válidos en texto de receta en español:
-        // - letras latinas y acentuadas
-        // - números y unidades comunes
-        // - signos de puntuación básicos
-        const valid = /[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ0-9\s.,;:!?\-()'"\u00b0\u00bd\u00bc\u00be/+%]/g;
-        const matches = text.match(valid) || [];
-        const validChars = matches.length;
-        const score = Math.round((validChars / text.length) * 100);
-
-        // Criterios para considerar "basura":
-        // - Menos del 70% de caracteres válidos
-        // - O el título parseado es muy corto y no contiene vocales claras
-        const titleStr = String(parsed && parsed.title || '');
-        const titleHasVowels = /[aeiouáéíóúAEIOUÁÉÍÓÚ]/.test(titleStr);
-        const titleTooShort = titleStr.replace(/\s/g, '').length < 4;
-
-        const isGarbage = score < 70 || (titleTooShort && !titleHasVowels);
-
-        return { score, isGarbage };
+        return {
+            title: `${cleanTitle || 'Receta escaneada'} 📝 (revisar)`,
+            category: 'Otros',
+            channel: 'Recetario de Mamá (OCR local)',
+            ingredients: ingredientsLines.join('\n'),
+            instructions: instructionsLines.join('\n')
+        };
     }
 
     Object.assign(window, {
@@ -2905,7 +2655,7 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         analyzeNutritionAI, closeNutritionModal,
         openAdaptRecipe, closeAdaptRecipe, selectAdaptPreset, processAdaptRecipeAI, saveAdaptedAsNewRecipe,
         triggerRecipePhotoCapture, processRecipePhoto,
-        openScanMethodModal, closeScanMethodModal, chooseScanMethod
+        openScanOptionsMenu, closeScanOptionsMenu, selectScanMethod
     });
 </script>
 </body>
