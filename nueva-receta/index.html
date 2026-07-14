@@ -387,7 +387,7 @@
                         </button>
                         <button onclick="openScanMethodModal()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-2 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-xs">
                             <i class="fa-solid fa-camera"></i>
-                            Importar Receta
+                            Escanear Receta
                         </button>
                     </div>
                     <input type="file" id="recipePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="processRecipePhoto(event)">
@@ -864,7 +864,7 @@
                 </div>
                 <div class="flex-1">
                     <h4 class="font-extrabold text-sm text-slate-800 dark:text-white">Escanear Local (Tesseract.js)</h4>
-                    <p class="text-[0.75rem] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">OCR 100% offline en tu navegador. No requiere API Key. La primera vez descarga el modelo de idioma.</p>
+                    <p class="text-[0.75rem] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">OCR 100% offline. No requiere API Key. Funciona mejor con <strong>recetas impresas</strong>; en texto manuscrito puede fallar. Si la calidad es baja, se ofrece reintento con Google IA.</p>
                 </div>
             </button>
         </div>
@@ -2643,6 +2643,19 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         };
     }
 
+    // === MOTOR LOCAL (Tesseract.js) - con preprocesamiento de imagen ===
+    //
+    // Pipeline:
+    //   1. Cargar imagen a canvas
+    //   2. Convertir a escala de grises
+    //   3. Auto-contrast (estirar histograma)
+    //   4. Upscale 2x si la imagen es pequeña (textos finos se reconocen mejor)
+    //   5. Nitidez (sharpen) para reforzar bordes de letras
+    //   6. Binarización Otsu (texto negro sobre blanco puro)
+    //   7. Tesseract con lang=spa+eng, PSM 6 (bloque uniforme), OEM 1 (LSTM)
+    //   8. Quality check: si el texto tiene >25% de caracteres basura,
+    //      se avisa al usuario y se ofrece reintento con Google IA.
+    //
     async function processRecipePhotoWithTesseract(file) {
         const loading = document.getElementById('loadingModal');
         loading.classList.remove('hidden');
@@ -2653,19 +2666,23 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
                 throw new Error('Tesseract.js no está cargado. Verifica tu conexión y recarga la página.');
             }
 
-            const dataUrl = await fileToDataURL(file);
+            // --- 1. PREPROCESAMIENTO DE IMAGEN ---
+            const processedDataUrl = await preprocessImageForOCR(file);
 
             setLoadingUI('Procesando con OCR Local...', 'Iniciando motor OCR (Tesseract.js)...');
 
-            const worker = await Tesseract.createWorker('spa', 1, {
+            // --- 2. CONFIGURAR TESSERACT ---
+            // spa+eng: español como idioma principal, inglés como apoyo (marca, unidades, etc.)
+            // OEM 1   = solo LSTM (mejor precisión moderna)
+            const worker = await Tesseract.createWorker(['spa', 'eng'], 1, {
                 logger: m => {
                     if (!m) return;
                     if (m.status === 'recognizing text') {
                         const pct = Math.round((m.progress || 0) * 100);
                         setLoadingUI('Procesando con OCR Local...', `Reconociendo texto... ${pct}%`);
-                    } else if (m.status === 'loading language traineddata') {
+                    } else if (m.status === 'loading language traineddata' || m.status === 'loading language traineddata (from cache)') {
                         const pct = Math.round((m.progress || 0) * 100);
-                        setLoadingUI('Procesando con OCR Local...', `Descargando modelo de idioma... ${pct}% (solo la primera vez)`);
+                        setLoadingUI('Procesando con OCR Local...', `Cargando modelo de idioma... ${pct}% (solo la primera vez)`);
                     } else if (m.status === 'initializing tesseract' || m.status === 'initializing api') {
                         setLoadingUI('Procesando con OCR Local...', 'Inicializando motor OCR...');
                     } else if (m.status) {
@@ -2674,26 +2691,202 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
                 }
             });
 
-            const { data } = await worker.recognize(dataUrl);
+            // PSM 6 = la imagen es un solo bloque uniforme de texto (típico en recetas)
+            // preserve_interword_spaces = 1 conserva los espacios entre palabras
+            await worker.setParameters({
+                tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+                preserve_interword_spaces: '1',
+            });
+
+            // --- 3. RECONOCIMIENTO ---
+            const { data } = await worker.recognize(processedDataUrl);
             await worker.terminate();
 
             const rawText = (data && data.text ? data.text : '').trim();
             if (!rawText) {
-                throw new Error('No se detectó texto en la imagen.');
+                throw new Error('No se detectó texto en la imagen. Prueba con mejor luz, acerca la cámara o usa Google IA.');
             }
 
             setLoadingUI('Procesando con OCR Local...', 'Estructurando receta reconocida...');
 
             const parsed = parseOcrTextToRecipe(rawText);
 
+            // --- 4. CHEQUEO DE CALIDAD ---
+            const quality = assessOcrQuality(rawText, parsed);
+            if (quality.isGarbage) {
+                loading.classList.add('hidden');
+                console.warn('OCR de baja calidad detectado.', { quality, rawText });
+                const hasGeminiKey = !!(localStorage.getItem('gemini_api_key') || '');
+                const msg = hasGeminiKey
+                    ? `El OCR local dio texto ilegible (calidad ${quality.score}%). ¿Reintentar con Google IA?`
+                    : `El OCR local dio texto ilegible (calidad ${quality.score}%). Configura tu API Key de Gemini en ⚙️ para mejor precisión, o reescanea con más luz y la cámara más cerca.`;
+                if (hasGeminiKey && confirm(msg)) {
+                    // Reintento automático con Gemini
+                    currentScanMode = 'gemini';
+                    await processRecipePhotoWithGemini(file);
+                } else {
+                    showToast(msg, 'error');
+                    // Aun así abrimos el formulario para que el usuario corrija a mano
+                    applyParsedRecipeToForm(parsed, '⚠️ OCR de baja calidad. Revisa a mano antes de guardar.');
+                }
+                return;
+            }
+
             loading.classList.add('hidden');
-            applyParsedRecipeToForm(parsed, '📸 Receta reconocida localmente. Revisa y guarda.');
+            applyParsedRecipeToForm(parsed, `📸 Receta reconocida localmente (calidad ${quality.score}%). Revisa y guarda.`);
 
         } catch (e) {
             console.error(e);
             loading.classList.add('hidden');
             showToast('No se pudo leer la foto con OCR local. Intenta con mejor luz o usa Google IA.', 'error');
         }
+    }
+
+    // Carga un File/Blob en un HTMLImageElement
+    function loadImageElement(file) {
+        return new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => { resolve(img); };
+            img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+            img.src = url;
+        });
+    }
+
+    // Preprocesa la imagen del File para que Tesseract la lea mejor.
+    // Devuelve un dataURL PNG en blanco y negro, optimizado para OCR.
+    async function preprocessImageForOCR(file) {
+        const img = await loadImageElement(file);
+
+        // Upscale si la imagen es pequeña (texto fino se reconoce mejor a >=1500px lado largo)
+        const maxSide = Math.max(img.width, img.height);
+        let scale = 1;
+        if (maxSide < 1500) scale = 2;
+        if (maxSide < 800)  scale = 3;
+
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const d = imageData.data;
+
+        // --- Paso 1: escala de grises (luminancia perceptual) ---
+        const gray = new Uint8ClampedArray(w * h);
+        for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+            // Recortamos el fondo blanco: si un pixel es casi blanco, lo forzamos a blanco.
+            const r = d[i], g = d[i+1], b = d[i+2];
+            let y = (0.299 * r + 0.587 * g + 0.114 * b) | 0;
+            gray[j] = y;
+        }
+
+        // --- Paso 2: auto-contraste (estirar histograma al rango 0-255) ---
+        let min = 255, max = 0;
+        for (let i = 0; i < gray.length; i++) {
+            const v = gray[i];
+            if (v < min) min = v;
+            if (v > max) max = v;
+        }
+        const range = Math.max(1, max - min);
+        for (let i = 0; i < gray.length; i++) {
+            gray[i] = ((gray[i] - min) * 255 / range) | 0;
+        }
+
+        // --- Paso 3: boost de contraste (factor 1.4) ---
+        const contrast = 1.4;
+        const cFactor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+        for (let i = 0; i < gray.length; i++) {
+            let v = cFactor * (gray[i] - 128) + 128;
+            if (v < 0) v = 0; else if (v > 255) v = 255;
+            gray[i] = v | 0;
+        }
+
+        // --- Paso 4: nitidez (filtro 3x3 sharpen) ---
+        // Aplicamos convolución simple; grayIn -> grayOut
+        const sharpened = new Uint8ClampedArray(w * h);
+        const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                let acc = 0;
+                for (let ky = -1; ky <= 1; ky++) {
+                    for (let kx = -1; kx <= 1; kx++) {
+                        const sx = Math.min(w - 1, Math.max(0, x + kx));
+                        const sy = Math.min(h - 1, Math.max(0, y + ky));
+                        const k = kernel[(ky + 1) * 3 + (kx + 1)];
+                        acc += gray[sy * w + sx] * k;
+                    }
+                }
+                if (acc < 0) acc = 0; else if (acc > 255) acc = 255;
+                sharpened[y * w + x] = acc | 0;
+            }
+        }
+
+        // --- Paso 5: binarización Otsu ---
+        const hist = new Array(256).fill(0);
+        for (let i = 0; i < sharpened.length; i++) hist[sharpened[i]]++;
+        const total = sharpened.length;
+        let sumTotal = 0;
+        for (let i = 0; i < 256; i++) sumTotal += i * hist[i];
+        let sumB = 0, wB = 0, maxVar = -1, threshold = 128;
+        for (let i = 0; i < 256; i++) {
+            wB += hist[i];
+            if (wB === 0) continue;
+            const wF = total - wB;
+            if (wF === 0) break;
+            sumB += i * hist[i];
+            const mB = sumB / wB;
+            const mF = (sumTotal - sumB) / wF;
+            const between = wB * wF * (mB - mF) * (mB - mF);
+            if (between > maxVar) {
+                maxVar = between;
+                threshold = i;
+            }
+        }
+
+        // --- Paso 6: escribir resultado binarizado en el canvas ---
+        for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+            const v = sharpened[j] > threshold ? 255 : 0;
+            d[i] = d[i+1] = d[i+2] = v;
+            // d[i+3] (alpha) queda igual
+        }
+        ctx.putImageData(imageData, 0, 0);
+
+        return canvas.toDataURL('image/png');
+    }
+
+    // Heurística para detectar si el OCR produjo texto ilegible (garbage).
+    // Devuelve { score: 0-100, isGarbage: bool }.
+    // score = porcentaje de "caracteres buenos" (letras, números, signos comunes en español).
+    function assessOcrQuality(rawText, parsed) {
+        const text = String(rawText || '');
+        if (text.length < 5) return { score: 0, isGarbage: true };
+
+        // Caracteres válidos en texto de receta en español:
+        // - letras latinas y acentuadas
+        // - números y unidades comunes
+        // - signos de puntuación básicos
+        const valid = /[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ0-9\s.,;:!?\-()'"\u00b0\u00bd\u00bc\u00be/+%]/g;
+        const matches = text.match(valid) || [];
+        const validChars = matches.length;
+        const score = Math.round((validChars / text.length) * 100);
+
+        // Criterios para considerar "basura":
+        // - Menos del 70% de caracteres válidos
+        // - O el título parseado es muy corto y no contiene vocales claras
+        const titleStr = String(parsed && parsed.title || '');
+        const titleHasVowels = /[aeiouáéíóúAEIOUÁÉÍÓÚ]/.test(titleStr);
+        const titleTooShort = titleStr.replace(/\s/g, '').length < 4;
+
+        const isGarbage = score < 70 || (titleTooShort && !titleHasVowels);
+
+        return { score, isGarbage };
     }
 
     Object.assign(window, {
