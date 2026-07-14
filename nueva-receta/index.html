@@ -1842,23 +1842,47 @@ Si no hay ingredientes identificables, responde exactamente: { "ingredients": ""
         const rd = document.getElementById('apiTestResult');
         rd.className = 'text-xs p-3 rounded-lg bg-slate-100 text-slate-700 block';
         rd.innerHTML = "<i class='fa-solid fa-spinner animate-spin mr-1'></i> Conectando...";
+
+        if (!key) {
+            rd.className = 'text-xs p-3 rounded-lg bg-red-50 text-red-800 border border-red-200 block';
+            rd.innerHTML = '❌ Ingresa una clave antes de guardar.';
+            return;
+        }
+
         try {
             const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
                 method: 'POST', headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({ contents: [{ parts: [{ text: 'Hola' }] }] })
             });
             const d = await r.json();
+
             if (r.ok && d.candidates) {
                 localStorage.setItem('gemini_api_key', key);
                 rd.className = 'text-xs p-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 block';
                 rd.innerHTML = '✅ ¡Clave válida y guardada!';
-            } else {
+            } else if (r.status === 429) {
+                // La clave es válida en formato, solo se agotó la cuota de Gemini en este momento.
+                // La guardamos igual: no tiene sentido pedirla de nuevo por un límite temporal.
+                localStorage.setItem('gemini_api_key', key);
+                rd.className = 'text-xs p-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 block';
+                rd.innerHTML = '⚠️ Clave guardada. Ahora mismo Gemini está sin cuota disponible, pero la clave quedó lista para cuando se libere.';
+            } else if (r.status === 400 || r.status === 403) {
+                // Aquí sí es un problema real de la clave (formato inválido, API no habilitada, etc.)
                 rd.className = 'text-xs p-3 rounded-lg bg-red-50 text-red-800 border border-red-200 block';
                 rd.innerHTML = '❌ ' + (d.error?.message || 'Clave inválida o modelo no habilitado');
+            } else {
+                // Otro error (500, etc.): guardamos la clave de todos modos, ya que probablemente
+                // sea un problema temporal del servicio y no de la clave en sí.
+                localStorage.setItem('gemini_api_key', key);
+                rd.className = 'text-xs p-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 block';
+                rd.innerHTML = '⚠️ Clave guardada. Hubo un problema temporal al probarla (' + (d.error?.message || `HTTP ${r.status}`) + ').';
             }
         } catch(e) {
-            rd.className = 'text-xs p-3 rounded-lg bg-red-50 text-red-800 border border-red-200 block';
-            rd.innerHTML = '❌ Error de conexión';
+            // Error de red/conexión: no sabemos si la clave es válida, pero tampoco perdamos lo que
+            // el usuario ya escribió — la guardamos y avisamos que no se pudo verificar.
+            localStorage.setItem('gemini_api_key', key);
+            rd.className = 'text-xs p-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 block';
+            rd.innerHTML = '⚠️ Clave guardada, pero no se pudo verificar por un error de conexión.';
         }
     }
 
