@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+    <!-- Transformers.js (TrOCR): se carga vía dynamic import() dentro de processRecipePhotoTrOCR -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
     <script>
@@ -104,7 +105,7 @@
             backdrop-filter: blur(15px) !important;
             -webkit-backdrop-filter: blur(15px) !important;
         }
-        .dark .bg-white/90, .dark .bg-white/95 {
+        .dark .bg-white\/90, .dark .bg-white\/95 {
             background-color: #0c0c0c !important;
         }
         .dark .category-btn:not(.active) {
@@ -377,7 +378,7 @@
                     </div>
                 </div>
 
-                <!-- Footer Unificado del Importador IA -->
+                <!-- Footer Unificado del Importador IA (Visible en PC y en la lista móvil) -->
                 <div id="sidebarImportFooter" class="p-4 border-b border-white/10 bg-white/20 dark:bg-slate-950/20 flex-shrink-0">
                     <div class="flex items-center gap-2">
                         <button onclick="openImportModal()" class="flex-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-sky-500 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-2 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-xs">
@@ -386,10 +387,9 @@
                         </button>
                         <button onclick="openScanOptionsMenu()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-2 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-xs">
                             <i class="fa-solid fa-camera"></i>
-                            Escanear Receta
+                            Importar Receta
                         </button>
                     </div>
-                    <!-- INPUTS DE ESCANEO DE FOTO -->
                     <input type="file" id="recipePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="processRecipePhoto(event)">
                     <input type="file" id="recipePhotoInputTesseract" accept="image/*" class="hidden" onchange="processRecipePhoto(event)">
                     <input type="file" id="recipePhotoInputTrOCR" accept="image/*" class="hidden" onchange="processRecipePhoto(event)">
@@ -407,7 +407,7 @@
                     <div class="glass-card p-8 rounded-2xl text-center max-w-xs border border-white/40 shadow-xl">
                         <i class="fa-solid fa-kitchen-set text-6xl text-blue-500 mb-4 animate-bounce block"></i>
                         <h3 class="text-lg font-extrabold text-slate-800 dark:text-white mb-2">¡Listo para cocinar, Diego!</h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Selecciona una receta o utiliza el importador inteligente con IA para extraer contenido de tus cuadernos o videos.</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Selecciona una receta o utiliza el importador inteligente con IA para extraer contenido de videos.</p>
                     </div>
                 </div>
 
@@ -529,7 +529,7 @@
                             </a>
                         </div>
 
-                        <!-- Ingredientes -->
+                        <!-- Ingredientes (Optimizados en espaciado py-0.5 y gap-y-1.5 para mayor compacidad) -->
                         <div class="glass-card p-5 rounded-2xl border border-white/35 dark:border-white/5 shadow-md">
                             <div class="flex items-center justify-between mb-4 pb-2 border-b border-white/10">
                                 <h3 class="font-serif text-lg font-black text-slate-900 dark:text-white">Ingredientes</h3>
@@ -559,6 +559,8 @@
                     </div>
                 </div>
             </main>
+
+            <!-- FAB móvil -->
         </div>
     </div>
 </div>
@@ -702,7 +704,7 @@
     </div>
 </div>
 
-<!-- IMPORTADOR IA -->
+<!-- IMPORTADOR IA (Completamente en blanco y libre de alucinaciones) -->
 <div id="importModal" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-end md:items-center justify-center p-0 md:p-4">
     <div class="bg-white/90 dark:bg-slate-900/90 border border-white/20 dark:border-white/5 rounded-t-3xl md:rounded-3xl shadow-2xl w-full md:max-w-lg flex flex-col max-h-[90%] overflow-hidden" style="padding-bottom: env(safe-area-inset-bottom)">
         <div class="p-4 border-b border-white/10 flex items-center justify-between bg-white/20 dark:bg-black/10 flex-shrink-0">
@@ -830,7 +832,7 @@
                 <textarea id="formInstructions" placeholder="Mezclar todos los ingredientes de la masa.&#10;Cocinar a la plancha..." rows="4"
                     class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs focus:ring-0 glass-input text-slate-900 dark:text-white font-mono forced-light-input"></textarea>
             </div>
-            <button onclick="saveRecipe(event)" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs shadow-lg" style="min-height:48px">
+            <button onclick="saveRecipe(event)" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs shadow-lg animate-pulse" style="min-height:48px">
                 Guardar Receta 📖
             </button>
         </div>
@@ -847,7 +849,7 @@
                 <i class="fa-solid fa-utensils animate-pulse"></i>
             </div>
         </div>
-        <h3 class="text-white font-extrabold text-base">Procesando Receta...</h3>
+        <h3 class="text-white font-extrabold text-base">Procesando con Gemini IA...</h3>
         <p id="loadingProgressText" class="text-slate-400 text-xs max-w-xs leading-relaxed">Buscando, estructurando y traduciendo la receta en formato profesional...</p>
     </div>
 </div>
@@ -906,7 +908,7 @@
     </div>
 </div>
 
-<!-- MENÚ DE OPCIONES DE ESCANEO TRIPARTITA -->
+<!-- MENÚ DE OPCIONES DE ESCANEO -->
 <div id="scanOptionsModal" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-end md:items-center justify-center p-0 md:p-4" onclick="if(event.target === this) closeScanOptionsMenu()">
     <div class="bg-white dark:bg-slate-900 rounded-t-3xl md:rounded-3xl shadow-2xl max-w-sm w-full border border-white/10">
         <div class="p-5 border-b border-white/10 flex items-center justify-between">
@@ -920,8 +922,6 @@
         </div>
         <div class="p-5 space-y-3">
             <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Elige cómo quieres transcribir la foto de tu receta.</p>
-            
-            <!-- Opción 1: Gemini -->
             <button onclick="selectScanMethod('gemini')" class="w-full flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-blue-500 via-indigo-500 to-sky-500 text-white text-left transition-all active:scale-95 shadow-md" style="min-height:44px">
                 <i class="fa-solid fa-cloud text-lg"></i>
                 <div class="flex-1">
@@ -929,22 +929,18 @@
                     <p class="text-[0.7rem] opacity-90">Más preciso · requiere API Key e internet</p>
                 </div>
             </button>
-            
-            <!-- Opción 2: Tesseract -->
             <button onclick="selectScanMethod('tesseract')" class="w-full flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-left transition-all active:scale-95 shadow-md" style="min-height:44px">
                 <i class="fa-solid fa-microchip text-lg"></i>
                 <div class="flex-1">
                     <p class="font-bold text-sm">Escaneo local (Tesseract.js)</p>
-                    <p class="text-[0.7rem] opacity-90">Sin API Key · Recomendado para texto impreso</p>
+                    <p class="text-[0.7rem] opacity-90">Sin API Key · para mejor resultado, escanea antes en Notas/Archivos y elige la foto en Fototeca</p>
                 </div>
             </button>
-
-            <!-- Opción 3: TrOCR Local AI (Novedad) -->
-            <button onclick="selectScanMethod('trocr')" class="w-full flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-left transition-all active:scale-95 shadow-md" style="min-height:44px">
-                <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+            <button onclick="selectScanMethod('trocr')" class="w-full flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 text-white text-left transition-all active:scale-95 shadow-md" style="min-height:44px">
+                <i class="fa-solid fa-brain text-lg"></i>
                 <div class="flex-1">
                     <p class="font-bold text-sm">Escaneo IA Local (Manuscrito)</p>
-                    <p class="text-[0.7rem] opacity-90">100% Gratis e Local (TrOCR) · Especial para letra cursiva</p>
+                    <p class="text-[0.7rem] opacity-90">TrOCR vía Transformers.js · ideal para letra manuscrita/cursiva · primer uso descarga ~300 MB</p>
                 </div>
             </button>
         </div>
@@ -1664,6 +1660,8 @@
             return { title: "", author: "" };
         }
 
+        // Primer intento (rápido) y, si falla o se demora, un segundo intento con más tiempo de espera
+        // antes de resignarse al título genérico. Esto reduce los casos en que noembed.com responde lento.
         let result = await fetchYouTubeTitleJSONPAttempt(videoUrl, ytId, 5000);
         if (!result) {
             result = await fetchYouTubeTitleJSONPAttempt(videoUrl, ytId, 6000);
@@ -1684,6 +1682,8 @@
         return "";
     }
 
+    // Revisa una descripción/caption (de TikTok o Instagram) y extrae SOLO los ingredientes si están
+    // explícitamente escritos, sin inventar nada. Devuelve '' si no encuentra nada identificable.
     async function extractIngredientsFromCaptionAI(captionText) {
         if (!captionText || captionText.trim().length < 5) return '';
         const apiKey = localStorage.getItem('gemini_api_key') || "";
@@ -1721,6 +1721,7 @@ Si no hay ingredientes identificables, responde exactamente: { "ingredients": ""
         }
     }
 
+    // === IMPORTADOR LIMPIO: EVITA ALUCINACIONES Y DEJA LOS TEXTOS TOTALMENTE VACÍOS Y LISTOS PARA ESCRIBIR ===
     async function processPastedDescriptionWithAI() {
         const videoUrl = document.getElementById('importLinkInput').value.trim();
         const customImage = document.getElementById('importImageUrlInput').value.trim();
@@ -1751,6 +1752,7 @@ Si no hay ingredientes identificables, responde exactamente: { "ingredients": ""
                 const oembedData = await fetchYouTubeTitleJSONP(videoUrl);
                 videoTitle = oembedData.title;
                 videoAuthor = oembedData.author;
+                // En TikTok, el campo "título" del oEmbed normalmente trae la descripción/caption completa del video
                 if (platform === 'tiktok') {
                     fetchedCaption = oembedData.title || '';
                 }
@@ -1769,6 +1771,8 @@ Si no hay ingredientes identificables, responde exactamente: { "ingredients": ""
             const finalImage = customImage || (ytId ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : '');
             const platformDefaultChannel = platform === 'tiktok' ? 'TikTok' : platform === 'instagram' ? 'Instagram' : 'YouTube';
 
+            // Ingredientes: solo se intenta extraer si hay algo de texto disponible (caption traída
+            // automáticamente de TikTok, o descripción pegada a mano por el usuario, útil sobre todo para Instagram)
             const captionForIngredients = (userDesc || fetchedCaption || '').trim();
             let extractedIngredients = '';
             if (captionForIngredients) {
@@ -1779,16 +1783,21 @@ Si no hay ingredientes identificables, responde exactamente: { "ingredients": ""
             closeImportModal();
             loading.classList.add('hidden');
 
-            // Inyección unificada de receta detectada
-            injectRecipeAndOpenForm({
-                title: videoTitle,
-                category: 'Otros',
-                channel: videoAuthor || platformDefaultChannel,
-                instagramUrl: videoUrl,
-                imageUrl: finalImage,
-                ingredients: extractedIngredients || userDesc || '',
-                instructions: ''
-            });
+            document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
+            document.getElementById('editRecipeId').value = '';
+            
+            document.getElementById('formTitle').value = videoTitle;
+            document.getElementById('formCategory').value = 'Otros';
+            document.getElementById('formChannel').value = videoAuthor || platformDefaultChannel;
+            document.getElementById('formInstagramUrl').value = videoUrl;
+            document.getElementById('formImageUrl').value = finalImage;
+            
+            // Si Gemini logró identificar ingredientes reales en la descripción, los dejamos ya cargados.
+            // Si no, dejamos lo que el usuario haya escrito a mano (o vacío) para evitar inventar información.
+            document.getElementById('formIngredients').value = extractedIngredients || userDesc || '';
+            document.getElementById('formInstructions').value = '';
+
+            document.getElementById('recipeModal').classList.remove('hidden');
 
             showToast(extractedIngredients
                 ? "✨ Título, canal e ingredientes detectados. Revisa la receta."
@@ -1861,18 +1870,25 @@ Si no hay ingredientes identificables, responde exactamente: { "ingredients": ""
                 rd.className = 'text-xs p-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 block';
                 rd.innerHTML = '✅ ¡Clave válida y guardada!';
             } else if (r.status === 429) {
+                // La clave es válida en formato, solo se agotó la cuota de Gemini en este momento.
+                // La guardamos igual: no tiene sentido pedirla de nuevo por un límite temporal.
                 localStorage.setItem('gemini_api_key', key);
                 rd.className = 'text-xs p-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 block';
                 rd.innerHTML = '⚠️ Clave guardada. Ahora mismo Gemini está sin cuota disponible, pero la clave quedó lista para cuando se libere.';
             } else if (r.status === 400 || r.status === 403) {
+                // Aquí sí es un problema real de la clave (formato inválido, API no habilitada, etc.)
                 rd.className = 'text-xs p-3 rounded-lg bg-red-50 text-red-800 border border-red-200 block';
                 rd.innerHTML = '❌ ' + (d.error?.message || 'Clave inválida o modelo no habilitado');
             } else {
+                // Otro error (500, etc.): guardamos la clave de todos modos, ya que probablemente
+                // sea un problema temporal del servicio y no de la clave en sí.
                 localStorage.setItem('gemini_api_key', key);
                 rd.className = 'text-xs p-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 block';
                 rd.innerHTML = '⚠️ Clave guardada. Hubo un problema temporal al probarla (' + (d.error?.message || `HTTP ${r.status}`) + ').';
             }
         } catch(e) {
+            // Error de red/conexión: no sabemos si la clave es válida, pero tampoco perdamos lo que
+            // el usuario ya escribió — la guardamos y avisamos que no se pudo verificar.
             localStorage.setItem('gemini_api_key', key);
             rd.className = 'text-xs p-3 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 block';
             rd.innerHTML = '⚠️ Clave guardada, pero no se pudo verificar por un error de conexión.';
@@ -2379,6 +2395,7 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
         const fileName = `Mi_Recetario_Diego_${fecha}.json`;
         const blob = new Blob([jsonStr], { type: 'application/json' });
 
+        // En iPhone/PWA instalada, el Share Sheet nativo es el método confiable
         try {
             const file = new File([blob], fileName, { type: 'application/json' });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -2387,9 +2404,11 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
                 return;
             }
         } catch (err) {
-            if (err && err.name === 'AbortError') { return; } 
+            if (err && err.name === 'AbortError') { return; } // el usuario canceló el share sheet
+            // si falla el share, seguimos con el fallback de abajo
         }
 
+        // Fallback (funciona bien en Safari/Chrome de escritorio y navegador normal en iOS)
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -2417,24 +2436,7 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
         reader.readAsText(file);
     }
 
-    // === FUNCIÓN ÚNICA DE RENDEREADO/INYECCIÓN DE RECETA ===
-    // Asegura que las tres opciones de escaneo (Gemini, Tesseract y TrOCR) usen el mismo modal, formulario e interfaz de inyección
-    function injectRecipeAndOpenForm(recipeData) {
-        document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
-        document.getElementById('editRecipeId').value = '';
-
-        document.getElementById('formTitle').value = recipeData.title || 'Nueva Receta Detectada 📝';
-        document.getElementById('formCategory').value = recipeData.category || 'Otros';
-        document.getElementById('formChannel').value = recipeData.channel || 'Recetario de Diego';
-        document.getElementById('formInstagramUrl').value = recipeData.instagramUrl || '';
-        document.getElementById('formImageUrl').value = recipeData.imageUrl || '';
-        document.getElementById('formIngredients').value = normalizeNewlineString(recipeData.ingredients || '');
-        document.getElementById('formInstructions').value = normalizeNewlineString(recipeData.instructions || '');
-
-        document.getElementById('recipeModal').classList.remove('hidden');
-    }
-
-    // === ESCANEAR RECETA A MANO POR FOTO (Tripartita: Gemini Vision, Tesseract o TrOCR Local) ===
+    // === ESCANEAR RECETA A MANO POR FOTO (menú: Gemini Vision o Tesseract.js local) ===
     let selectedScanMethod = 'gemini';
 
     function openScanOptionsMenu() {
@@ -2447,20 +2449,29 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
 
     function selectScanMethod(method) {
         closeScanOptionsMenu();
-        selectedScanMethod = method;
         if (method === 'tesseract') {
+            // Advertencia honesta: Tesseract.js es un OCR clásico entrenado con texto
+            // impreso. No reconoce bien letra manuscrita/cursiva sin importar la calidad
+            // de la foto — esa es una limitación del motor, no de la imagen. Para recetas
+            // a mano, Gemini (IA) es la opción que realmente funciona.
             const seguirLocal = window.confirm(
                 '⚠️ El escaneo local (Tesseract.js) funciona bien con texto impreso o digital, ' +
-                'pero NO reconoce letra manuscrita/cursiva de forma confiable.\n\n' +
-                'Si tu receta está escrita a mano, te recomendamos usar "Escaneo IA Local (Manuscrito)" o Gemini.'
+                'pero NO reconoce letra manuscrita/cursiva de forma confiable, sin importar qué tan ' +
+                'buena sea la foto — es una limitación del motor.\n\n' +
+                'Si tu receta está escrita a mano, te recomendamos usar el escaneo con Gemini (IA).\n\n' +
+                'Pulsa "Aceptar" para continuar con el escaneo local de todos modos, o "Cancelar" para usar Gemini.'
             );
+            selectedScanMethod = seguirLocal ? 'tesseract' : 'gemini';
             if (seguirLocal) {
                 document.getElementById('recipePhotoInputTesseract').click();
+            } else {
+                triggerRecipePhotoCapture();
             }
         } else if (method === 'trocr') {
-            // El escaneo por TrOCR es un modelo 100% local basado en Transformers que sí está diseñado para letra cursiva/manuscrita
+            selectedScanMethod = 'trocr';
             document.getElementById('recipePhotoInputTrOCR').click();
         } else {
+            selectedScanMethod = method;
             triggerRecipePhotoCapture();
         }
     }
@@ -2503,7 +2514,7 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
         const loading = document.getElementById('loadingModal');
         const progress = document.getElementById('loadingProgressText');
         loading.classList.remove('hidden');
-        progress.innerText = 'Leyendo la foto de la receta con Gemini...';
+        progress.innerText = 'Leyendo la foto de la receta...';
 
         try {
             const base64Data = await fileToBase64(file);
@@ -2548,16 +2559,19 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
 
             loading.classList.add('hidden');
 
-            // Inyectar con función unificada
-            injectRecipeAndOpenForm({
-                title: parsed.title || 'Receta de Mamá 📝',
-                category: parsed.category || 'Otros',
-                channel: parsed.channel || 'Recetario de Mamá',
-                ingredients: parsed.ingredients || '',
-                instructions: parsed.instructions || ''
-            });
+            document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
+            document.getElementById('editRecipeId').value = '';
 
-            showToast('📸 Receta transcrita con Gemini. Revisa y guarda.');
+            document.getElementById('formTitle').value = parsed.title || 'Receta de Mamá 📝';
+            document.getElementById('formCategory').value = parsed.category || 'Otros';
+            document.getElementById('formChannel').value = parsed.channel || 'Recetario de Mamá';
+            document.getElementById('formInstagramUrl').value = '';
+            document.getElementById('formImageUrl').value = '';
+            document.getElementById('formIngredients').value = normalizeNewlineString(parsed.ingredients || '');
+            document.getElementById('formInstructions').value = normalizeNewlineString(parsed.instructions || '');
+
+            document.getElementById('recipeModal').classList.remove('hidden');
+            showToast('📸 Receta transcrita. Revisa y guarda.');
 
         } catch (e) {
             console.error(e);
@@ -2590,19 +2604,24 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
 
             if (!text || !text.trim()) throw new Error('No se detectó texto legible en la imagen.');
 
+            // Normalizamos el texto crudo del OCR al mismo esquema que usa el motor de Gemini:
+            // title, category, channel, ingredients, instructions.
             const parsed = parseOcrTextToRecipeStructure(text);
 
             loading.classList.add('hidden');
 
-            // Inyectar con función unificada
-            injectRecipeAndOpenForm({
-                title: parsed.title,
-                category: parsed.category,
-                channel: parsed.channel,
-                ingredients: parsed.ingredients,
-                instructions: parsed.instructions
-            });
+            document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
+            document.getElementById('editRecipeId').value = '';
 
+            document.getElementById('formTitle').value = parsed.title;
+            document.getElementById('formCategory').value = parsed.category;
+            document.getElementById('formChannel').value = parsed.channel;
+            document.getElementById('formInstagramUrl').value = '';
+            document.getElementById('formImageUrl').value = '';
+            document.getElementById('formIngredients').value = normalizeNewlineString(parsed.ingredients);
+            document.getElementById('formInstructions').value = normalizeNewlineString(parsed.instructions);
+
+            document.getElementById('recipeModal').classList.remove('hidden');
             showToast('📸 Receta escaneada localmente. Revisa y ajusta los campos.');
 
         } catch (e) {
@@ -2612,165 +2631,9 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         }
     }
 
-    // --- Motor 3: Escaneo 100% local con TrOCR via Transformers.js ---
-    // Este motor segmenta la foto de forma inteligente en líneas para que el modelo TrOCR (diseñado para líneas unitarias de escritura) las reconozca con precisión.
-    async function processRecipePhotoTrOCR(file) {
-        const loading = document.getElementById('loadingModal');
-        const progress = document.getElementById('loadingProgressText');
-        loading.classList.remove('hidden');
-        progress.innerText = 'Inicializando IA local para manuscritos...';
-
-        try {
-            // Importación bajo demanda del motor Transformers.js de Hugging Face
-            if (!window.pipeline) {
-                progress.innerText = 'Descargando motor local de Hugging Face (~80MB, solo se descarga la primera vez)...';
-                const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.1.2');
-                
-                // Forzar ejecución en CPU/GPU WebGL del navegador
-                env.allowLocalModels = false;
-                
-                progress.innerText = 'Instanciando modelo TrOCR (Xenova/trocr-small-handwritten)...';
-                window.pipeline = pipeline;
-                window.trocrModel = await pipeline('image-to-text', 'Xenova/trocr-small-handwritten');
-            }
-
-            progress.innerText = 'Segmentando renglones en la foto de tu cuaderno...';
-            const linesImageUrls = await segmentImageIntoLines(file);
-
-            if (linesImageUrls.length === 0) {
-                // Si la segmentación no encuentra cortes claros, usamos la imagen completa como fallback
-                const reader = new FileReader();
-                const fileUrl = await new Promise(res => {
-                    reader.onload = () => res(reader.result);
-                    reader.readAsDataURL(file);
-                });
-                linesImageUrls.push(fileUrl);
-            }
-
-            let recognizedLines = [];
-            let processedCount = 0;
-
-            // Procesamos cada línea detectada de forma síncrona/secuencial para no congelar el hilo del navegador
-            for (const lineUrl of linesImageUrls) {
-                processedCount++;
-                progress.innerText = `Transcribiendo letra manuscrita... Renglón ${processedCount} de ${linesImageUrls.length}`;
-                
-                try {
-                    const result = await window.trocrModel(lineUrl);
-                    if (result && result[0] && result[0].generated_text) {
-                        recognizedLines.push(result[0].generated_text.trim());
-                    }
-                } catch (err) {
-                    console.error("Error transcribiendo línea:", err);
-                }
-            }
-
-            const rawJoinedText = recognizedLines.join('\n');
-            if (!rawJoinedText.trim()) throw new Error('No se pudo rescatar texto coherente con el modelo local.');
-
-            // Estructuramos el resultado del OCR local
-            const parsed = parseOcrTextToRecipeStructure(rawJoinedText);
-
-            loading.classList.add('hidden');
-
-            // Inyectar usando la misma función unificada
-            injectRecipeAndOpenForm({
-                title: parsed.title.replace('(revisar)', '(Manuscrito IA Local)'),
-                category: parsed.category,
-                channel: 'Cuaderno de Recetas Antiguo 📔',
-                ingredients: parsed.ingredients,
-                instructions: parsed.instructions
-            });
-
-            showToast('✨ Manuscrito escaneado con IA Local. Revisa los renglones traducidos.');
-
-        } catch (e) {
-            console.error(e);
-            loading.classList.add('hidden');
-            showToast('El modelo local falló. Te recomendamos usar el Escaneo con Google (Gemini) para letra cursiva compleja.', 'error');
-        }
-    }
-
-    // Algoritmo avanzado de proyección horizontal en Canvas para detectar renglones y aislar la letra a mano
-    function segmentImageIntoLines(file) {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = function() {
-                const maxDim = 800; // Redimensionar para procesamiento rápido
-                let w = img.width;
-                let h = img.height;
-                if (w > h && w > maxDim) { h = (maxDim/w)*h; w = maxDim; }
-                else if (h > maxDim) { w = (maxDim/h)*w; h = maxDim; }
-
-                const canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, w, h);
-
-                const imgData = ctx.getImageData(0, 0, w, h);
-                const data = imgData.data;
-
-                // 1. Generar perfil de proyección horizontal (intensidad de píxeles negros/grises por fila)
-                const projection = new Array(h).fill(0);
-                for (let y = 0; y < h; y++) {
-                    let rowSum = 0;
-                    for (let x = 0; x < w; x++) {
-                        const idx = (y * w + x) * 4;
-                        const r = data[idx];
-                        const g = data[idx+1];
-                        const b = data[idx+2];
-                        const gray = 0.299*r + 0.587*g + 0.114*b; // Escala de grises
-                        if (gray < 160) { // Umbral adaptativo para píxeles oscuros (tinta)
-                            rowSum++;
-                        }
-                    }
-                    projection[y] = rowSum;
-                }
-
-                // 2. Detectar valles y crestas para aislar los renglones
-                const lines = [];
-                let inLine = false;
-                let startY = 0;
-                const minLineHeight = 12; // Descartar ruidos pequeños
-
-                for (let y = 0; y < h; y++) {
-                    const isDark = projection[y] > (w * 0.015); // Si más de 1.5% del renglón tiene tinta
-                    if (isDark && !inLine) {
-                        inLine = true;
-                        startY = Math.max(0, y - 4); // Añadir un margen superior
-                    } else if (!isDark && inLine) {
-                        inLine = false;
-                        const endY = Math.min(h, y + 4); // Añadir un margen inferior
-                        if ((endY - startY) > minLineHeight) {
-                            lines.push({ startY, endY });
-                        }
-                    }
-                }
-
-                // 3. Recortar sub-imágenes por renglones y exportarlas como Data URLs
-                const slicedUrls = [];
-                lines.forEach(segment => {
-                    const lineCanvas = document.createElement('canvas');
-                    lineCanvas.width = w;
-                    lineCanvas.height = segment.endY - segment.startY;
-                    const lineCtx = lineCanvas.getContext('2d');
-                    lineCtx.drawImage(canvas, 0, segment.startY, w, segment.endY - segment.startY, 0, 0, w, segment.endY - segment.startY);
-                    slicedUrls.push(lineCanvas.toDataURL('image/jpeg', 0.85));
-                });
-
-                resolve(slicedUrls);
-            };
-            img.onerror = () => resolve([]);
-            
-            const reader = new FileReader();
-            reader.onload = (e) => img.src = e.target.result;
-            reader.readAsDataURL(file);
-        });
-    }
-
     // Heurística local (sin IA) para separar título / ingredientes / instrucciones
-    // a partir del texto crudo que entrega Tesseract.js o TrOCR, respetando el mismo esquema.
+    // a partir del texto crudo que entrega Tesseract.js, respetando la misma
+    // estructura de datos que produce el motor de Gemini Vision.
     function parseOcrTextToRecipeStructure(rawText) {
         const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
 
@@ -2806,6 +2669,8 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
             ingredientsLines = lines.slice(1, instructionsIdx);
             instructionsLines = lines.slice(instructionsIdx + 1);
         } else {
+            // Sin encabezados claros: usamos la primera línea como título y clasificamos
+            // el resto por patrones típicos de medidas/ingredientes vs. texto de pasos.
             title = lines[0];
             const rest = lines.slice(1);
             rest.forEach(l => {
@@ -2828,6 +2693,137 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         };
     }
 
+    // --- Motor 3: Escaneo IA Local con TrOCR vía Transformers.js (manuscrito/cursiva) ---
+    // Caché del pipeline para no descargar el modelo en cada uso
+    let _trocrPipeline = null;
+    let _trocrLoading = false;
+
+    async function processRecipePhotoTrOCR(file) {
+        const loading = document.getElementById('loadingModal');
+        const progress = document.getElementById('loadingProgressText');
+        loading.classList.remove('hidden');
+        progress.innerText = 'Preparando modelo TrOCR (IA manuscrita)...';
+
+        try {
+            // Dynamic import de Transformers.js (se carga solo cuando se necesita)
+            let pipeline;
+            try {
+                const transformersModule = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+                pipeline = transformersModule.pipeline;
+            } catch (importErr) {
+                throw new Error('No se pudo cargar Transformers.js. Verifica tu conexión a internet para la primera descarga.');
+            }
+
+            if (!pipeline) {
+                throw new Error('Transformers.js no exportó la función pipeline.');
+            }
+
+            // Crear o reutilizar el pipeline (el modelo se cachea en el navegador)
+            if (!_trocrPipeline && !_trocrLoading) {
+                _trocrLoading = true;
+                progress.innerText = 'Descargando modelo TrOCR por primera vez (~300 MB)...';
+                try {
+                    _trocrPipeline = await pipeline(
+                        'image-to-text',
+                        'Xenova/trocr-base-handwritten',
+                        {
+                            progress_callback: function(p) {
+                                if (p.status === 'download' && p.file && typeof p.progress === 'number') {
+                                    const pct = Math.round(p.progress * 100);
+                                    const fileName = p.file.split('/').pop();
+                                    progress.innerText = 'Descargando modelo: ' + fileName + ' ' + pct + '%';
+                                } else if (p.status === 'progress' && typeof p.progress === 'number') {
+                                    const pct = Math.round(p.progress * 100);
+                                    progress.innerText = 'Cargando modelo TrOCR... ' + pct + '%';
+                                } else if (p.status === 'ready') {
+                                    progress.innerText = 'Modelo listo. Procesando imagen...';
+                                } else if (p.status) {
+                                    progress.innerText = p.status.charAt(0).toUpperCase() + p.status.slice(1) + '...';
+                                }
+                            }
+                        }
+                    );
+                } finally {
+                    _trocrLoading = false;
+                }
+            } else if (_trocrLoading) {
+                // Esperar a que termine la carga si otro llamado lo inició
+                progress.innerText = 'Modelo ya descargándose, espera un momento...';
+                while (_trocrLoading) {
+                    await new Promise(function(r) { setTimeout(r, 500); });
+                }
+            }
+
+            if (!_trocrPipeline) {
+                throw new Error('No se pudo inicializar el modelo TrOCR.');
+            }
+
+            // Preprocesar la imagen: redimensionar si es muy grande para mejorar velocidad
+            progress.innerText = 'Procesando imagen con TrOCR...';
+            const imageBitmap = await createImageBitmap(file);
+            const MAX_DIM = 1280;
+            let processedBitmap = imageBitmap;
+            if (imageBitmap.width > MAX_DIM || imageBitmap.height > MAX_DIM) {
+                const scale = MAX_DIM / Math.max(imageBitmap.width, imageBitmap.height);
+                processedBitmap = await createImageBitmap(
+                    imageBitmap,
+                    { resizeWidth: Math.round(imageBitmap.width * scale), resizeHeight: Math.round(imageBitmap.height * scale) }
+                );
+                imageBitmap.close();
+            }
+
+            // Ejecutar reconocimiento de texto con TrOCR
+            progress.innerText = 'Reconociendo letra manuscrita con IA...';
+            const results = await _trocrPipeline(processedBitmap, { max_new_tokens: 512 });
+            processedBitmap.close();
+
+            // TrOCR devuelve un array de objetos con la propiedad 'generated_text'
+            const recognizedLines = results
+                .map(function(r) { return (r.generated_text || '').trim(); })
+                .filter(function(t) { return t.length > 0; });
+
+            if (recognizedLines.length === 0) {
+                throw new Error('TrOCR no detectó texto en la imagen. Asegúrate de que la foto tenga buena luz y el texto sea legible.');
+            }
+
+            // Unir todas las líneas reconocidas
+            const fullText = recognizedLines.join('\n');
+
+            // Usar la misma función de parseo que Tesseract para estructurar la receta
+            const parsed = parseOcrTextToRecipeStructure(fullText);
+            // Sobrescribir el channel para distinguir el motor usado
+            parsed.channel = 'Recetario de Mamá (TrOCR IA local)';
+
+            loading.classList.add('hidden');
+
+            // Inyectar resultado en el formulario usando la misma estructura que Gemini y Tesseract
+            document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
+            document.getElementById('editRecipeId').value = '';
+
+            document.getElementById('formTitle').value = parsed.title;
+            document.getElementById('formCategory').value = parsed.category;
+            document.getElementById('formChannel').value = parsed.channel;
+            document.getElementById('formInstagramUrl').value = '';
+            document.getElementById('formImageUrl').value = '';
+            document.getElementById('formIngredients').value = normalizeNewlineString(parsed.ingredients);
+            document.getElementById('formInstructions').value = normalizeNewlineString(parsed.instructions);
+
+            document.getElementById('recipeModal').classList.remove('hidden');
+            showToast('🧠 Receta reconocida con IA local (TrOCR). Revisa y ajusta los campos.');
+
+        } catch (e) {
+            console.error('Error en TrOCR:', e);
+            loading.classList.add('hidden');
+            let msg = 'No se pudo procesar la foto con TrOCR. ';
+            if (e.message && e.message.includes('Failed to fetch')) {
+                msg += 'Se necesita conexión a internet para descargar el modelo la primera vez.';
+            } else if (e.message) {
+                msg += e.message;
+            }
+            showToast(msg, 'error');
+        }
+    }
+
     Object.assign(window, {
         selectRecipe, toggleFavoriteInline, toggleFavoriteActive,
         setCategoryFilter, filterRecipes,
@@ -2843,9 +2839,8 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         openChefChat, closeChefChat, sendChefChatMessage,
         analyzeNutritionAI, closeNutritionModal,
         openAdaptRecipe, closeAdaptRecipe, selectAdaptPreset, processAdaptRecipeAI, saveAdaptedAsNewRecipe,
-        triggerRecipePhotoCapture, processRecipePhoto,
-        openScanOptionsMenu, closeScanOptionsMenu, selectScanMethod,
-        injectRecipeAndOpenForm
+        triggerRecipePhotoCapture, processRecipePhoto, processRecipePhotoTrOCR,
+        openScanOptionsMenu, closeScanOptionsMenu, selectScanMethod
     });
 </script>
 </body>
