@@ -2829,7 +2829,7 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
                 throw new Error('No se pudo inicializar el modelo TrOCR.');
             }
 
-            // Paso 3: Cargar imagen en un HTMLImageElement (compatible con todos los navegadores)
+            // Paso 3: Cargar imagen en un HTMLImageElement
             progress.innerText = 'Preparando imagen...';
             var imageElement = await new Promise(function(resolve, reject) {
                 var img = new Image();
@@ -2839,39 +2839,135 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
                 img.src = blobUrl;
             });
 
-            // Paso 4: Redimensionar con Canvas y convertir a data URL (string es el tipo
-            // más compatible con Transformers.js en todos los navegadores y contextos)
-            progress.innerText = 'Reconociendo letra manuscrita con IA...';
+            // Paso 4: Redimensionar si es muy grande
             var MAX_DIM = 1280;
             var w = imageElement.naturalWidth || imageElement.width;
             var h = imageElement.naturalHeight || imageElement.height;
-
             if (w > MAX_DIM || h > MAX_DIM) {
                 var scale = MAX_DIM / Math.max(w, h);
                 w = Math.round(w * scale);
                 h = Math.round(h * scale);
             }
 
-            var canvas = document.createElement('canvas');
-            canvas.width = w;
-            canvas.height = h;
-            canvas.getContext('2d').drawImage(imageElement, 0, 0, w, h);
-            var imageDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            // Paso 5: Preprocesar imagen (escala de grises + binarización Otsu)
+            // TrOCR funciona MUCHO mejor con texto negro sobre fondo blanco
+            progress.innerText = 'Preprocesando imagen (contraste)...';
+            var srcCanvas = document.createElement('canvas');
+            srcCanvas.width = w;
+            srcCanvas.height = h;
+            var srcCtx = srcCanvas.getContext('2d');
+            srcCtx.drawImage(imageElement, 0, 0, w, h);
+            var imgData = srcCtx.getImageData(0, 0, w, h);
+            var px = imgData.data;
 
-            // Paso 5: Ejecutar reconocimiento pasando un string (data URL), que
-            // Transformers.js siempre reconoce sin importar navegador o contexto
-            var results = await trocrPipeline(imageDataUrl);
-
-            // Paso 5: Extraer líneas reconocidas
-            var recognizedLines = (results || [])
-                .map(function(r) { return (r.generated_text || '').trim(); })
-                .filter(function(t) { return t.length > 0; });
-
-            if (recognizedLines.length === 0) {
-                throw new Error('TrOCR no detectó texto en la imagen. Asegúrate de que la foto tenga buena luz y el texto sea legible.');
+            // Escala de grises
+            for (var i = 0; i < px.length; i += 4) {
+                var gray = Math.round(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]);
+                px[i] = px[i + 1] = px[i + 2] = gray;
             }
 
-            // Paso 6: Estructurar la receta (reutiliza la misma función que Tesseract)
+            // Calcular umbral Otsu
+            var hist = new Array(256);
+            for (var t = 0; t < 256; t++) hist[t] = 0;
+            for (var i = 0; i < px.length; i += 4) hist[px[i]]++;
+            var total = w * h, sumAll = 0;
+            for (var t = 0; t < 256; t++) sumAll += t * hist[t];
+            var sumB = 0, wB = 0, maxVar = 0, otsuThresh = 128;
+            for (var t = 0; t < 256; t++) {
+                wB += hist[t];
+                if (wB === 0) continue;
+                var wF = total - wB;
+                if (wF === 0) break;
+                sumB += t * hist[t];
+                var mB = sumB / wB, mF = (sumAll - sumB) / wF;
+                var v = wB * wF * (mB - mF) * (mB - mF);
+                if (v > maxVar) { maxVar = v; otsuThresh = t; }
+            }
+
+            // Binarizar: píxeles oscuros = tinta, claros = fondo
+            for (var i = 0; i < px.length; i += 4) {
+                var v = px[i] < otsuThresh ? 0 : 255;
+                px[i] = px[i + 1] = px[i + 2] = v;
+            }
+            srcCtx.putImageData(imgData, 0, 0);
+
+            // Paso 6: Detectar líneas de texto (barrido horizontal buscando regiones con tinta)
+            progress.innerText = 'Detectando líneas de texto...';
+            var binData = srcCtx.getImageData(0, 0, w, h).data;
+            var rowInk = new Array(h);
+            for (var y = 0; y < h; y++) {
+                var ink = 0;
+                for (var x = 0; x < w; x++) {
+                    ink += (255 - binData[(y * w + x) * 4]);
+                }
+                rowInk[y] = ink;
+            }
+            var avgInk = rowInk.reduce(function(a, b) { return a + b; }, 0) / h;
+            var inkThresh = Math.max(avgInk * 0.12, 100);
+
+            var rawLines = [];
+            var inLine = false, lineStart = 0;
+            for (var y = 0; y < h; y++) {
+                if (rowInk[y] > inkThresh && !inLine) {
+                    inLine = true;
+                    lineStart = y;
+                } else if ((rowInk[y] <= inkThresh || y === h - 1) && inLine) {
+                    inLine = false;
+                    rawLines.push({ s: lineStart, e: y === h - 1 && rowInk[y] > inkThresh ? h : y });
+                }
+            }
+
+            // Fusionar líneas muy cercanas (gap < 8px)
+            var lines = [];
+            for (var i = 0; i < rawLines.length; i++) {
+                if (lines.length > 0 && rawLines[i].s - lines[lines.length - 1].e < 8) {
+                    lines[lines.length - 1].e = rawLines[i].e;
+                } else {
+                    lines.push({ s: rawLines[i].s, e: rawLines[i].e });
+                }
+            }
+
+            // Filtrar líneas demasiado pequeñas (ruido)
+            lines = lines.filter(function(l) { return (l.e - l.s) >= 8; });
+
+            // Paso 7: Procesar CADA línea por separado con TrOCR
+            // (TrOCR está diseñado para reconocer una línea a la vez)
+            var recognizedLines = [];
+            var totalLines = lines.length;
+
+            if (totalLines === 0) {
+                // Si no se detectaron líneas, procesar la imagen completa
+                progress.innerText = 'Reconociendo texto completo...';
+                var fullResult = await trocrPipeline(srcCanvas.toDataURL('image/png'));
+                var fullTexts = (fullResult || []).map(function(r) { return (r.generated_text || '').trim(); }).filter(function(t) { return t.length > 1; });
+                recognizedLines = fullTexts;
+            } else {
+                for (var i = 0; i < totalLines; i++) {
+                    progress.innerText = 'Reconociendo línea ' + (i + 1) + ' de ' + totalLines + '...';
+                    var pad = 4;
+                    var ly = Math.max(0, lines[i].s - pad);
+                    var lh = Math.min(h, lines[i].e + pad) - ly;
+                    var lineCanvas = document.createElement('canvas');
+                    lineCanvas.width = w;
+                    lineCanvas.height = lh;
+                    lineCanvas.getContext('2d').drawImage(srcCanvas, 0, ly, w, lh, 0, 0, w, lh);
+                    var lineDataUrl = lineCanvas.toDataURL('image/png');
+
+                    try {
+                        var lineResult = await trocrPipeline(lineDataUrl);
+                        var texts = (lineResult || []).map(function(r) { return (r.generated_text || '').trim(); }).filter(function(t) { return t.length > 1; });
+                        recognizedLines = recognizedLines.concat(texts);
+                    } catch (lineErr) {
+                        console.warn('[TrOCR] Error en línea ' + (i + 1) + ':', lineErr);
+                    }
+                }
+            }
+
+            if (recognizedLines.length === 0) {
+                throw new Error('TrOCR no detectó texto legible. Intenta con una foto con mejor luz y contraste.');
+            }
+
+            // Paso 8: Estructurar la receta (reutiliza la misma función que Tesseract)
             var fullText = recognizedLines.join('\n');
             var parsed = parseOcrTextToRecipeStructure(fullText);
             parsed.channel = 'Recetario de Mamá (TrOCR IA local)';
