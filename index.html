@@ -21,6 +21,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
     <!-- Transformers.js (TrOCR): módulo que importa la librería y expone funciones al scope global -->
     <script type="module">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
@@ -186,7 +188,7 @@
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.95) !important;
         }
-        .dark #recipeModal, .dark #importModal, .dark #chefChatModal, .dark #nutritionModal, .dark #adaptModal, .dark #configModal, .dark #backupModal, .dark #deleteConfirmModal, .dark #scanOptionsModal {
+        .dark #recipeModal, .dark #importModal, .dark #chefChatModal, .dark #nutritionModal, .dark #adaptModal, .dark #configModal, .dark #backupModal, .dark #deleteConfirmModal, .dark #scanOptionsModal, .dark #cropModal {
             background-color: rgba(0, 0, 0, 0.9) !important;
             backdrop-filter: blur(15px) !important;
             -webkit-backdrop-filter: blur(15px) !important;
@@ -1028,6 +1030,41 @@
                     <p class="font-bold text-sm">Escaneo IA Local (Manuscrito)</p>
                     <p class="text-[0.7rem] opacity-90">TrOCR vía Transformers.js · ideal para letra manuscrita/cursiva · primer uso descarga ~300 MB</p>
                 </div>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE RECORTE DE IMAGEN -->
+<div id="cropModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-3" onclick="if(event.target===this)cancelCrop()">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden" style="max-height:90vh">
+        <!-- Header -->
+        <div class="p-4 border-b border-slate-200/30 dark:border-white/10 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                <i class="fa-solid fa-crop-simple text-lg"></i>
+                <h3 class="font-extrabold text-sm text-slate-800 dark:text-slate-100">Ajustar imagen antes de escanear</h3>
+            </div>
+            <button onclick="cancelCrop()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <!-- Área del cropper -->
+        <div class="flex-1 overflow-hidden bg-black/5 dark:bg-black/30" style="min-height:260px;max-height:55vh">
+            <img id="cropImage" class="block w-full" style="max-height:55vh" crossorigin="anonymous">
+        </div>
+        <!-- Toolbar de controles -->
+        <div class="p-3 border-t border-slate-200/30 dark:border-white/10 flex items-center justify-center gap-2 flex-shrink-0">
+            <button onclick="cropRotate(-90)" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 active:scale-90 transition-transform" title="Rotar izquierda"><i class="fa-solid fa-rotate-left text-sm"></i></button>
+            <button onclick="cropRotate(90)" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 active:scale-90 transition-transform" title="Rotar derecha"><i class="fa-solid fa-rotate-right text-sm"></i></button>
+            <button onclick="cropZoom(0.1)" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 active:scale-90 transition-transform" title="Acercar"><i class="fa-solid fa-magnifying-glass-plus text-sm"></i></button>
+            <button onclick="cropZoom(-0.1)" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 active:scale-90 transition-transform" title="Alejar"><i class="fa-solid fa-magnifying-glass-minus text-sm"></i></button>
+            <button onclick="cropFlipH()" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 active:scale-90 transition-transform" title="Voltear horizontal"><i class="fa-solid fa-left-right text-sm"></i></button>
+        </div>
+        <!-- Botones de acción -->
+        <div class="p-3 border-t border-slate-200/30 dark:border-white/10 flex gap-2 flex-shrink-0">
+            <button onclick="skipCrop()" class="flex-1 py-3 rounded-xl text-sm font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 active:scale-95 transition-transform" style="min-height:44px">
+                <i class="fa-solid fa-forward mr-1"></i> Escanear sin recortar
+            </button>
+            <button onclick="confirmCrop()" class="flex-1 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-emerald-500 to-teal-600 text-white active:scale-95 transition-transform shadow-md" style="min-height:44px">
+                <i class="fa-solid fa-crop-simple mr-1"></i> Recortar y escanear
             </button>
         </div>
     </div>
@@ -2581,18 +2618,103 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
         });
     }
 
+    // === RECORTE DE IMAGEN ANTES DE ESCANEAR (Cropper.js) ===
+    var _cropInstance = null;
+    var _pendingScanFile = null;
+
+    function showCropModal(file) {
+        _pendingScanFile = file;
+        var img = document.getElementById('cropImage');
+        img.src = URL.createObjectURL(file);
+        document.getElementById('cropModal').classList.remove('hidden');
+
+        setTimeout(function() {
+            if (_cropInstance) { _cropInstance.destroy(); _cropInstance = null; }
+            _cropInstance = new Cropper(img, {
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 0.85,
+                responsive: true,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: false,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+                background: true
+            });
+        }, 100);
+    }
+
+    function destroyCropper() {
+        if (_cropInstance) { _cropInstance.destroy(); _cropInstance = null; }
+        var img = document.getElementById('cropImage');
+        if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+        img.src = '';
+        document.getElementById('cropModal').classList.add('hidden');
+    }
+
+    function cancelCrop() {
+        destroyCropper();
+        _pendingScanFile = null;
+    }
+
+    function cropRotate(deg) {
+        if (_cropInstance) _cropInstance.rotate(deg);
+    }
+
+    function cropZoom(ratio) {
+        if (_cropInstance) _cropInstance.zoom(ratio);
+    }
+
+    function cropFlipH() {
+        if (_cropInstance) {
+            var d = _cropInstance.getData();
+            _cropInstance.scaleX(-d.scaleX || -1);
+        }
+    }
+
+    function getCroppedFile(callback) {
+        var canvas = _cropInstance.getCroppedCanvas({ maxWidth: 2048, maxHeight: 2048, imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
+        canvas.toBlob(function(blob) {
+            var croppedFile = new File([blob], 'receta.jpg', { type: 'image/jpeg', lastModified: Date.now() });
+            callback(croppedFile);
+        }, 'image/jpeg', 0.92);
+    }
+
+    function dispatchToEngine(file) {
+        if (selectedScanMethod === 'tesseract') {
+            processRecipePhotoTesseract(file);
+        } else if (selectedScanMethod === 'trocr') {
+            processRecipePhotoTrOCR(file);
+        } else {
+            processRecipePhotoGemini(file);
+        }
+    }
+
+    function confirmCrop() {
+        if (!_cropInstance || !_pendingScanFile) return;
+        getCroppedFile(function(croppedFile) {
+            var f = croppedFile;
+            destroyCropper();
+            dispatchToEngine(f);
+        });
+    }
+
+    function skipCrop() {
+        var f = _pendingScanFile;
+        destroyCropper();
+        if (f) dispatchToEngine(f);
+    }
+
     async function processRecipePhoto(event) {
         const file = event.target.files && event.target.files[0];
         event.target.value = '';
         if (!file) return;
 
-        if (selectedScanMethod === 'tesseract') {
-            await processRecipePhotoTesseract(file);
-        } else if (selectedScanMethod === 'trocr') {
-            await processRecipePhotoTrOCR(file);
-        } else {
-            await processRecipePhotoGemini(file);
-        }
+        // Mostrar modal de recorte antes de enviar al motor de OCR
+        showCropModal(file);
     }
 
     // --- Motor 1: Escaneo con Gemini Vision (API de Google) ---
@@ -2780,6 +2902,8 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
     }
 
     // --- Motor 3: Escaneo IA Local con TrOCR vía Transformers.js (manuscrito/cursiva) ---
+    // Nota: TrOCR-base-handwritten fue entrenado principalmente con texto manuscrito en INGLÉS.
+    // Para español manuscrito puede tener resultados limitados. Si no reconoce bien, usar Gemini.
 
     async function processRecipePhotoTrOCR(file) {
         const loading = document.getElementById('loadingModal');
@@ -2829,7 +2953,7 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
                 throw new Error('No se pudo inicializar el modelo TrOCR.');
             }
 
-            // Paso 3: Cargar imagen en un HTMLImageElement (compatible con todos los navegadores)
+            // Paso 3: Cargar imagen
             progress.innerText = 'Preparando imagen...';
             var imageElement = await new Promise(function(resolve, reject) {
                 var img = new Image();
@@ -2839,35 +2963,231 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
                 img.src = blobUrl;
             });
 
-            // Paso 4: Redimensionar con Canvas si es muy grande y pasar al pipeline
-            progress.innerText = 'Reconociendo letra manuscrita con IA...';
-            var MAX_DIM = 1280;
+            // Paso 4: Redimensionar (más resolución para mejor reconocimiento)
+            var MAX_DIM = 1600;
             var w = imageElement.naturalWidth || imageElement.width;
             var h = imageElement.naturalHeight || imageElement.height;
-
             if (w > MAX_DIM || h > MAX_DIM) {
                 var scale = MAX_DIM / Math.max(w, h);
                 w = Math.round(w * scale);
                 h = Math.round(h * scale);
             }
+            console.log('[TrOCR] Dimensión de imagen:', w, 'x', h);
 
-            var canvas = document.createElement('canvas');
-            canvas.width = w;
-            canvas.height = h;
-            canvas.getContext('2d').drawImage(imageElement, 0, 0, w, h);
+            // Paso 5: Preprocesar imagen — escala de grises + binarización Otsu mejorada
+            progress.innerText = 'Preprocesando imagen (contraste)...';
+            var srcCanvas = document.createElement('canvas');
+            srcCanvas.width = w;
+            srcCanvas.height = h;
+            var srcCtx = srcCanvas.getContext('2d');
+            // Fondo blanco puro antes de dibujar
+            srcCtx.fillStyle = '#FFFFFF';
+            srcCtx.fillRect(0, 0, w, h);
+            srcCtx.drawImage(imageElement, 0, 0, w, h);
+            var imgData = srcCtx.getImageData(0, 0, w, h);
+            var px = imgData.data;
 
-            var results = await window.__trOCR_run(canvas, trocrPipeline);
-
-            // Paso 5: Extraer líneas reconocidas
-            var recognizedLines = (results || [])
-                .map(function(r) { return (r.generated_text || '').trim(); })
-                .filter(function(t) { return t.length > 0; });
-
-            if (recognizedLines.length === 0) {
-                throw new Error('TrOCR no detectó texto en la imagen. Asegúrate de que la foto tenga buena luz y el texto sea legible.');
+            // 5a: Escala de grises
+            for (var i = 0; i < px.length; i += 4) {
+                var gray = Math.round(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]);
+                px[i] = px[i + 1] = px[i + 2] = gray;
             }
 
-            // Paso 6: Estructurar la receta (reutiliza la misma función que Tesseract)
+            // 5b: Calcular umbral Otsu
+            var hist = new Array(256);
+            for (var t = 0; t < 256; t++) hist[t] = 0;
+            for (var i = 0; i < px.length; i += 4) hist[px[i]]++;
+            var total = w * h, sumAll = 0;
+            for (var t = 0; t < 256; t++) sumAll += t * hist[t];
+            var sumB = 0, wB = 0, maxVar = 0, otsuThresh = 128;
+            for (var t = 0; t < 256; t++) {
+                wB += hist[t];
+                if (wB === 0) continue;
+                var wF = total - wB;
+                if (wF === 0) break;
+                sumB += t * hist[t];
+                var mB = sumB / wB, mF = (sumAll - sumB) / wF;
+                var v = wB * wF * (mB - mF) * (mB - mF);
+                if (v > maxVar) { maxVar = v; otsuThresh = t; }
+            }
+            console.log('[TrOCR] Umbral Otsu calculado:', otsuThresh);
+
+            // 5c: Detectar si la imagen está invertida (más píxeles oscuros que claros)
+            var darkPixels = 0;
+            for (var i = 0; i < px.length; i += 4) {
+                if (px[i] < 128) darkPixels++;
+            }
+            var darkRatio = darkPixels / total;
+            var needsInvert = darkRatio > 0.5;
+            console.log('[TrOCR] Ratio píxeles oscuros:', (darkRatio * 100).toFixed(1) + '%', needsInvert ? '→ INVERTIR' : '→ OK');
+
+            // 5d: Binarizar
+            for (var i = 0; i < px.length; i += 4) {
+                var isInk = needsInvert ? (px[i] > otsuThresh) : (px[i] < otsuThresh);
+                px[i] = px[i + 1] = px[i + 2] = isInk ? 0 : 255;
+            }
+            srcCtx.putImageData(imgData, 0, 0);
+
+            // 5e: Dilatación morfológica leve (engrosa trazos finos de 1px)
+            // Esto ayuda a TrOCR a detectar letras con trazos muy finos
+            progress.innerText = 'Mejorando trazos...';
+            var dilated = srcCtx.getImageData(0, 0, w, h);
+            var d = dilated.data;
+            var src = srcCtx.getImageData(0, 0, w, h).data;
+            for (var y = 1; y < h - 1; y++) {
+                for (var x = 1; x < w - 1; x++) {
+                    var idx = (y * w + x) * 4;
+                    // Si el píxel actual ES tinta, dejar como está
+                    // Si NO es tinta, verificar si algún vecino SÍ lo es → hacer tinta
+                    if (src[idx] === 255) { // es fondo blanco
+                        if (src[((y-1)*w+x)*4] === 0 || src[((y+1)*w+x)*4] === 0 ||
+                            src[(y*w+x-1)*4] === 0 || src[(y*w+x+1)*4] === 0) {
+                            d[idx] = d[idx+1] = d[idx+2] = 0; // convertir a tinta
+                        }
+                    }
+                }
+            }
+            srcCtx.putImageData(dilated, 0, 0);
+
+            // Paso 6: Detectar líneas de texto — barrido horizontal con umbral sensible para manuscrito
+            progress.innerText = 'Detectando líneas de texto...';
+            var binData = srcCtx.getImageData(0, 0, w, h).data;
+            var rowInk = new Array(h);
+            for (var y = 0; y < h; y++) {
+                var ink = 0;
+                for (var x = 0; x < w; x++) {
+                    // Solo contar píxeles que son tinta (valor 0)
+                    if (binData[(y * w + x) * 4] === 0) ink++;
+                }
+                rowInk[y] = ink;
+            }
+
+            // Calcular percentil 75 de tinta por fila para un umbral más robusto
+            var sortedInk = rowInk.slice().sort(function(a, b) { return a - b; });
+            var p75 = sortedInk[Math.floor(h * 0.75)] || 0;
+            var avgInk = rowInk.reduce(function(a, b) { return a + b; }, 0) / h;
+            // Umbral bajo: 4% del promedio o 3% del p75 — sensible a trazos finos manuscritos
+            var inkThresh = Math.max(avgInk * 0.04, p75 * 0.03, 5);
+            console.log('[TrOCR] Estadísticas de tinta — Promedio:', avgInk.toFixed(1), 'P75:', p75, 'Umbral:', inkThresh.toFixed(1));
+
+            var rawLines = [];
+            var inLine = false, lineStart = 0;
+            for (var y = 0; y < h; y++) {
+                if (rowInk[y] > inkThresh && !inLine) {
+                    inLine = true;
+                    lineStart = y;
+                } else if ((rowInk[y] <= inkThresh || y === h - 1) && inLine) {
+                    inLine = false;
+                    rawLines.push({ s: lineStart, e: y === h - 1 && rowInk[y] > inkThresh ? h : y });
+                }
+            }
+            console.log('[TrOCR] Líneas crudas detectadas:', rawLines.length);
+
+            // Fusionar líneas muy cercanas (gap < 14px para manuscrito con trazos descendentes)
+            var MERGE_GAP = 14;
+            var lines = [];
+            for (var i = 0; i < rawLines.length; i++) {
+                if (lines.length > 0 && rawLines[i].s - lines[lines.length - 1].e < MERGE_GAP) {
+                    lines[lines.length - 1].e = rawLines[i].e;
+                } else {
+                    lines.push({ s: rawLines[i].s, e: rawLines[i].e });
+                }
+            }
+
+            // Filtrar líneas demasiado pequeñas (ruido < 6px)
+            lines = lines.filter(function(l) { return (l.e - l.s) >= 6; });
+            console.log('[TrOCR] Líneas después de fusionar y filtrar:', lines.length, JSON.stringify(lines));
+
+            // --- FUNCIÓN HELPER: Recortar espacio blanco horizontal de una franja ---
+            function trimLineH(canvas, lineY, lineH) {
+                var ctx = canvas.getContext('2d');
+                var stripData = ctx.getImageData(0, lineY, canvas.width, lineH).data;
+                var left = canvas.width, right = 0;
+                for (var yy = 0; yy < lineH; yy++) {
+                    for (var xx = 0; xx < canvas.width; xx++) {
+                        if (stripData[(yy * canvas.width + xx) * 4] === 0) {
+                            if (xx < left) left = xx;
+                            if (xx > right) right = xx;
+                        }
+                    }
+                }
+                // Agregar márgenes horizontales
+                var margin = 8;
+                left = Math.max(0, left - margin);
+                right = Math.min(canvas.width - 1, right + margin);
+                if (left >= right) left = 0; right = canvas.width; // seguridad
+                return { left: left, right: right };
+            }
+
+            // Paso 7: Procesar CADA línea por separado con TrOCR
+            var recognizedLines = [];
+            var totalLines = lines.length;
+
+            if (totalLines === 0) {
+                console.log('[TrOCR] No se detectaron líneas → intentando imagen completa...');
+                progress.innerText = 'Reconociendo texto completo...';
+                var fullResult = await trocrPipeline(srcCanvas.toDataURL('image/png'));
+                console.log('[TrOCR] Resultado imagen completa:', JSON.stringify(fullResult));
+                var fullTexts = (fullResult || []).map(function(r) { return (r.generated_text || '').trim(); }).filter(function(t) { return t.length > 1; });
+                recognizedLines = fullTexts;
+            } else {
+                for (var i = 0; i < totalLines; i++) {
+                    progress.innerText = 'Reconociendo línea ' + (i + 1) + ' de ' + totalLines + '...';
+                    var pad = 10; // padding vertical generoso para manuscrito
+
+                    // Obtener bounds de la línea con padding
+                    var ly = Math.max(0, lines[i].s - pad);
+                    var lh = Math.min(h, lines[i].e + pad) - ly;
+
+                    // Recortar espacio blanco horizontal
+                    var hBounds = trimLineH(srcCanvas, lines[i].s, lines[i].e - lines[i].s);
+                    var lx = hBounds.left;
+                    var lw = hBounds.right - hBounds.left + 1;
+
+                    var lineCanvas = document.createElement('canvas');
+                    lineCanvas.width = lw;
+                    lineCanvas.height = lh;
+                    var lineCtx = lineCanvas.getContext('2d');
+                    // Rellenar con blanco
+                    lineCtx.fillStyle = '#FFFFFF';
+                    lineCtx.fillRect(0, 0, lw, lh);
+                    // Copiar la franja recortada
+                    lineCtx.drawImage(srcCanvas, lx, ly, lw, lh, 0, 0, lw, lh);
+
+                    var lineDataUrl = lineCanvas.toDataURL('image/png');
+                    var lineH = lines[i].e - lines[i].s;
+                    console.log('[TrOCR] Línea', (i+1), '- Y:', lines[i].s, '-', lines[i].e, 'H:', lineH, 'Recorte H:', lx, '-', hBounds.right, 'Ancho:', lw);
+
+                    try {
+                        var lineResult = await trocrPipeline(lineDataUrl);
+                        console.log('[TrOCR] Resultado línea', (i+1), ':', JSON.stringify(lineResult));
+                        var texts = (lineResult || []).map(function(r) { return (r.generated_text || '').trim(); }).filter(function(t) { return t.length > 1; });
+                        if (texts.length > 0) {
+                            recognizedLines = recognizedLines.concat(texts);
+                        }
+                    } catch (lineErr) {
+                        console.warn('[TrOCR] Error en línea ' + (i + 1) + ':', lineErr);
+                    }
+                }
+            }
+
+            console.log('[TrOCR] Total líneas reconocidas:', recognizedLines.length, '→', JSON.stringify(recognizedLines));
+
+            // Paso 8: Si TrOCR no produjo texto significativo, intentar con Tesseract como fallback
+            if (recognizedLines.length === 0 || recognizedLines.join('').replace(/\s/g, '').length < 10) {
+                console.log('[TrOCR] Texto insuficiente (' + recognizedLines.join('').length + ' chars) → activando fallback a Tesseract...');
+                progress.innerText = 'TrOCR no reconoció bien. Intentando con Tesseract...';
+                loading.classList.add('hidden');
+
+                // Reutilizar la imagen original (preprocesada) como archivo para Tesseract
+                srcCanvas.toBlob(function(blob) {
+                    var fallbackFile = new File([blob], 'receta_fallback.png', { type: 'image/png' });
+                    processRecipePhotoTesseract(fallbackFile);
+                }, 'image/png');
+                return;
+            }
+
+            // Paso 9: Estructurar la receta (reutiliza la misma función que Tesseract)
             var fullText = recognizedLines.join('\n');
             var parsed = parseOcrTextToRecipeStructure(fullText);
             parsed.channel = 'Recetario de Mamá (TrOCR IA local)';
@@ -2919,7 +3239,8 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         analyzeNutritionAI, closeNutritionModal,
         openAdaptRecipe, closeAdaptRecipe, selectAdaptPreset, processAdaptRecipeAI, saveAdaptedAsNewRecipe,
         triggerRecipePhotoCapture, processRecipePhoto, processRecipePhotoTrOCR,
-        openScanOptionsMenu, closeScanOptionsMenu, selectScanMethod
+        openScanOptionsMenu, closeScanOptionsMenu, selectScanMethod,
+        cancelCrop, confirmCrop, skipCrop, cropRotate, cropZoom, cropFlipH
     });
 </script>
 </body>
