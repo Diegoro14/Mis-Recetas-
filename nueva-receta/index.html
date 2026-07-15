@@ -23,106 +23,21 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-    <!-- Transformers.js (TrOCR): módulo que importa la librería y expone funciones al scope global -->
-    <script type="module">
-        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
-
-        let _pipelineInst = null;
-        let _pipelineLoading = false;
-
-        window.__trOCR_createPipeline = async function(progressCb) {
-            if (_pipelineInst) return _pipelineInst;
-            if (_pipelineLoading) {
-                while (_pipelineLoading) await new Promise(function(r) { setTimeout(r, 500); });
-                return _pipelineInst;
-            }
-            _pipelineLoading = true;
-            try {
-                var pipelinePromise = pipeline('image-to-text', 'Xenova/trocr-base-handwritten', {
-                    quantized: true,
-                    progress_callback: progressCb || function() {}
-                });
-                var timeoutPromise = new Promise(function(_, reject) {
-                    setTimeout(function() {
-                        reject(new Error('La descarga/inicialización del modelo TrOCR superó los 90 segundos. Puede ser tu conexión o poca memoria disponible en el iPhone. Prueba con Wi-Fi y evita tener muchas apps/pestañas abiertas.'));
-                    }, 90000);
-                });
-                _pipelineInst = await Promise.race([pipelinePromise, timeoutPromise]);
-            } finally {
-                _pipelineLoading = false;
-            }
-            return _pipelineInst;
-        };
-
-        window.__trOCR_run = async function(img, pl) {
-            return await pl(img, { max_new_tokens: 512 });
-        };
-
-        window.__trOCRModuleReady = true;
-        console.log('[TrOCR] Módulo Transformers.js cargado correctamente.');
-    </script>
-
-    <!-- Fallback: si el primer módulo falló (import incompatible), intentar con esm.sh -->
-    <script type="module">
-        if (!window.__trOCRModuleReady) {
-            console.log('[TrOCR] CDN principal falló, intentando esm.sh...');
-            try {
-                const mod = await import('https://esm.sh/@xenova/transformers@2.17.2');
-                const { pipeline, env } = mod;
-                env.allowLocalModels = false;
-                env.useBrowserCache = true;
-
-                let _pipelineInst = null;
-                let _pipelineLoading = false;
-
-                window.__trOCR_createPipeline = async function(progressCb) {
-                    if (_pipelineInst) return _pipelineInst;
-                    if (_pipelineLoading) {
-                        while (_pipelineLoading) await new Promise(function(r) { setTimeout(r, 500); });
-                        return _pipelineInst;
-                    }
-                    _pipelineLoading = true;
-                    try {
-                        var pipelinePromise = pipeline('image-to-text', 'Xenova/trocr-base-handwritten', {
-                            quantized: true,
-                            progress_callback: progressCb || function() {}
-                        });
-                        var timeoutPromise = new Promise(function(_, reject) {
-                            setTimeout(function() {
-                                reject(new Error('La descarga/inicialización del modelo TrOCR superó los 90 segundos. Puede ser tu conexión o poca memoria disponible en el iPhone. Prueba con Wi-Fi y evita tener muchas apps/pestañas abiertas.'));
-                            }, 90000);
-                        });
-                        _pipelineInst = await Promise.race([pipelinePromise, timeoutPromise]);
-                    } finally {
-                        _pipelineLoading = false;
-                    }
-                    return _pipelineInst;
-                };
-
-                window.__trOCR_run = async function(img, pl) {
-                    return await pl(img, { max_new_tokens: 512 });
-                };
-
-                window.__trOCRModuleReady = true;
-                console.log('[TrOCR] Módulo cargado vía esm.sh correctamente.');
-            } catch (e2) {
-                console.error('[TrOCR] Todos los CDNs fallaron:', e2);
-                window.__trOCRModuleError = 'No se pudo cargar Transformers.js desde ningún CDN. Verifica tu conexión a internet.';
-            }
-        }
-    </script>
-
-    <!-- Timer de seguridad: si después de 20s el módulo no cargó, marca el error -->
+    <!-- === CONSOLA DE DEPURACIÓN MÓVIL (Eruda) ===
+         Botón flotante "🐞" que abre un panel de consola/logs directo en el iPhone,
+         sin necesitar una Mac con Web Inspector. Solo carga la librería si tocás el botón. -->
     <script>
-        setTimeout(function() {
-            if (!window.__trOCRModuleReady && !window.__trOCRModuleError) {
-                console.warn('[TrOCR] El módulo no se cargó después de 20 segundos.');
-                window.__trOCRModuleError = 'Transformers.js no se pudo cargar. Puede que tu navegador no soporte módulos ES o haya un problema de red. Intenta recargar la página.';
+        window.__toggleDebugConsole = function() {
+            if (window.eruda) {
+                if (window.__erudaVisible) { eruda.hide(); window.__erudaVisible = false; }
+                else { eruda.show(); window.__erudaVisible = true; }
+                return;
             }
-        }, 20000);
+            var s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/eruda@3.0.1/eruda.min.js';
+            s.onload = function() { eruda.init(); eruda.show(); window.__erudaVisible = true; };
+            document.body.appendChild(s);
+        };
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
@@ -489,12 +404,11 @@
                         </button>
                         <button onclick="openScanOptionsMenu()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 active:scale-95 text-white font-extrabold py-3.5 px-2 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-xs">
                             <i class="fa-solid fa-camera"></i>
-                            Importar Receta
+                            Escanear Receta
                         </button>
                     </div>
                     <input type="file" id="recipePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="processRecipePhoto(event)">
                     <input type="file" id="recipePhotoInputTesseract" accept="image/*" class="hidden" onchange="processRecipePhoto(event)">
-                    <input type="file" id="recipePhotoInputTrOCR" accept="image/*" class="hidden" onchange="processRecipePhoto(event)">
                 </div>
 
                 <!-- Lista de recetas -->
@@ -926,12 +840,12 @@
             </div>
             <div>
                 <label class="block text-[0.75rem] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">Ingredientes (uno por línea)</label>
-                <textarea id="formIngredients" placeholder="2 tazas de avena&#10;2 huevos&#10;1 plátano" rows="4"
+                <textarea id="formIngredients" placeholder="" rows="4"
                     class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs focus:ring-0 glass-input text-slate-900 dark:text-white font-mono forced-light-input"></textarea>
             </div>
             <div>
                 <label class="block text-[0.75rem] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">Preparación (un paso por línea)</label>
-                <textarea id="formInstructions" placeholder="Mezclar todos los ingredientes de la masa.&#10;Cocinar a la plancha..." rows="4"
+                <textarea id="formInstructions" placeholder="" rows="4"
                     class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs focus:ring-0 glass-input text-slate-900 dark:text-white font-mono forced-light-input"></textarea>
             </div>
             <button onclick="saveRecipe(event)" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs shadow-lg animate-pulse" style="min-height:48px">
@@ -1036,13 +950,6 @@
                 <div class="flex-1">
                     <p class="font-bold text-sm">Escaneo local (Tesseract.js)</p>
                     <p class="text-[0.7rem] opacity-90">Sin API Key · para mejor resultado, escanea antes en Notas/Archivos y elige la foto en Fototeca</p>
-                </div>
-            </button>
-            <button onclick="selectScanMethod('trocr')" class="w-full flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 text-white text-left transition-all active:scale-95 shadow-md" style="min-height:44px">
-                <i class="fa-solid fa-brain text-lg"></i>
-                <div class="flex-1">
-                    <p class="font-bold text-sm">Escaneo IA Local (Manuscrito)</p>
-                    <p class="text-[0.7rem] opacity-90">TrOCR vía Transformers.js · ideal para letra manuscrita/cursiva · primer uso descarga ~300 MB</p>
                 </div>
             </button>
         </div>
@@ -2587,26 +2494,8 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
     function selectScanMethod(method) {
         closeScanOptionsMenu();
         if (method === 'tesseract') {
-            // Advertencia honesta: Tesseract.js es un OCR clásico entrenado con texto
-            // impreso. No reconoce bien letra manuscrita/cursiva sin importar la calidad
-            // de la foto — esa es una limitación del motor, no de la imagen. Para recetas
-            // a mano, Gemini (IA) es la opción que realmente funciona.
-            const seguirLocal = window.confirm(
-                '⚠️ El escaneo local (Tesseract.js) funciona bien con texto impreso o digital, ' +
-                'pero NO reconoce letra manuscrita/cursiva de forma confiable, sin importar qué tan ' +
-                'buena sea la foto — es una limitación del motor.\n\n' +
-                'Si tu receta está escrita a mano, te recomendamos usar el escaneo con Gemini (IA).\n\n' +
-                'Pulsa "Aceptar" para continuar con el escaneo local de todos modos, o "Cancelar" para usar Gemini.'
-            );
-            selectedScanMethod = seguirLocal ? 'tesseract' : 'gemini';
-            if (seguirLocal) {
-                document.getElementById('recipePhotoInputTesseract').click();
-            } else {
-                triggerRecipePhotoCapture();
-            }
-        } else if (method === 'trocr') {
-            selectedScanMethod = 'trocr';
-            document.getElementById('recipePhotoInputTrOCR').click();
+            selectedScanMethod = 'tesseract';
+            document.getElementById('recipePhotoInputTesseract').click();
         } else {
             selectedScanMethod = method;
             triggerRecipePhotoCapture();
@@ -2700,8 +2589,6 @@ Instrucción de adaptación solicitada por el usuario: "${text}"`;
     function dispatchToEngine(file) {
         if (selectedScanMethod === 'tesseract') {
             processRecipePhotoTesseract(file);
-        } else if (selectedScanMethod === 'trocr') {
-            processRecipePhotoTrOCR(file);
         } else {
             processRecipePhotoGemini(file);
         }
@@ -2915,328 +2802,6 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         };
     }
 
-    // --- Motor 3: Escaneo IA Local con TrOCR vía Transformers.js (manuscrito/cursiva) ---
-    // Nota: TrOCR-base-handwritten fue entrenado principalmente con texto manuscrito en INGLÉS.
-    // Para español manuscrito puede tener resultados limitados. Si no reconoce bien, usar Gemini.
-
-    async function processRecipePhotoTrOCR(file) {
-        const loading = document.getElementById('loadingModal');
-        const progress = document.getElementById('loadingProgressText');
-        loading.classList.remove('hidden');
-
-        try {
-            // Paso 1: Esperar a que el módulo de Transformers.js esté disponible
-            if (!window.__trOCRModuleReady) {
-                progress.innerText = 'Cargando motor de IA manuscrita (primera vez puede tardar)...';
-                await new Promise(function(resolve, reject) {
-                    var timeout = setTimeout(function() {
-                        reject(new Error('La librería Transformers.js tardó demasiado en cargar. Recarga la página e inténtalo de nuevo.'));
-                    }, 25000);
-                    var interval = setInterval(function() {
-                        if (window.__trOCRModuleReady) {
-                            clearTimeout(timeout);
-                            clearInterval(interval);
-                            resolve();
-                        }
-                        if (window.__trOCRModuleError) {
-                            clearTimeout(timeout);
-                            clearInterval(interval);
-                            reject(new Error(window.__trOCRModuleError));
-                        }
-                    }, 400);
-                });
-            }
-
-            // Paso 2: Crear o reutilizar el pipeline (descarga modelo solo la primera vez)
-            progress.innerText = 'Inicializando modelo TrOCR...';
-            var trocrPipeline = await window.__trOCR_createPipeline(function(p) {
-                if (p.status === 'download' && p.file) {
-                    var pct = typeof p.progress === 'number' ? Math.round(p.progress * 100) : '';
-                    var nombre = p.file.split('/').pop();
-                    progress.innerText = 'Descargando modelo: ' + nombre + (pct ? ' ' + pct + '%' : '');
-                } else if (p.status === 'progress' && typeof p.progress === 'number') {
-                    progress.innerText = 'Cargando modelo TrOCR... ' + Math.round(p.progress * 100) + '%';
-                } else if (p.status === 'ready') {
-                    progress.innerText = 'Modelo listo. Procesando imagen...';
-                } else if (p.status) {
-                    progress.innerText = p.status.charAt(0).toUpperCase() + p.status.slice(1) + '...';
-                }
-            });
-
-            if (!trocrPipeline) {
-                throw new Error('No se pudo inicializar el modelo TrOCR.');
-            }
-
-            // Paso 3: Cargar imagen
-            progress.innerText = 'Preparando imagen...';
-            var imageElement = await new Promise(function(resolve, reject) {
-                var img = new Image();
-                var blobUrl = URL.createObjectURL(file);
-                img.onload = function() { URL.revokeObjectURL(blobUrl); resolve(img); };
-                img.onerror = function() { URL.revokeObjectURL(blobUrl); reject(new Error('No se pudo cargar la imagen seleccionada.')); };
-                img.src = blobUrl;
-            });
-
-            // Paso 4: Redimensionar (más resolución para mejor reconocimiento)
-            var MAX_DIM = 1600;
-            var w = imageElement.naturalWidth || imageElement.width;
-            var h = imageElement.naturalHeight || imageElement.height;
-            if (w > MAX_DIM || h > MAX_DIM) {
-                var scale = MAX_DIM / Math.max(w, h);
-                w = Math.round(w * scale);
-                h = Math.round(h * scale);
-            }
-            console.log('[TrOCR] Dimensión de imagen:', w, 'x', h);
-
-            // Paso 5: Preprocesar imagen — escala de grises + binarización Otsu mejorada
-            progress.innerText = 'Preprocesando imagen (contraste)...';
-            var srcCanvas = document.createElement('canvas');
-            srcCanvas.width = w;
-            srcCanvas.height = h;
-            var srcCtx = srcCanvas.getContext('2d');
-            // Fondo blanco puro antes de dibujar
-            srcCtx.fillStyle = '#FFFFFF';
-            srcCtx.fillRect(0, 0, w, h);
-            srcCtx.drawImage(imageElement, 0, 0, w, h);
-            var imgData = srcCtx.getImageData(0, 0, w, h);
-            var px = imgData.data;
-
-            // 5a: Escala de grises
-            for (var i = 0; i < px.length; i += 4) {
-                var gray = Math.round(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]);
-                px[i] = px[i + 1] = px[i + 2] = gray;
-            }
-
-            // 5b: Calcular umbral Otsu
-            var hist = new Array(256);
-            for (var t = 0; t < 256; t++) hist[t] = 0;
-            for (var i = 0; i < px.length; i += 4) hist[px[i]]++;
-            var total = w * h, sumAll = 0;
-            for (var t = 0; t < 256; t++) sumAll += t * hist[t];
-            var sumB = 0, wB = 0, maxVar = 0, otsuThresh = 128;
-            for (var t = 0; t < 256; t++) {
-                wB += hist[t];
-                if (wB === 0) continue;
-                var wF = total - wB;
-                if (wF === 0) break;
-                sumB += t * hist[t];
-                var mB = sumB / wB, mF = (sumAll - sumB) / wF;
-                var v = wB * wF * (mB - mF) * (mB - mF);
-                if (v > maxVar) { maxVar = v; otsuThresh = t; }
-            }
-            console.log('[TrOCR] Umbral Otsu calculado:', otsuThresh);
-
-            // 5c: Detectar si la imagen está invertida (más píxeles oscuros que claros)
-            var darkPixels = 0;
-            for (var i = 0; i < px.length; i += 4) {
-                if (px[i] < 128) darkPixels++;
-            }
-            var darkRatio = darkPixels / total;
-            var needsInvert = darkRatio > 0.5;
-            console.log('[TrOCR] Ratio píxeles oscuros:', (darkRatio * 100).toFixed(1) + '%', needsInvert ? '→ INVERTIR' : '→ OK');
-
-            // 5d: Binarizar
-            for (var i = 0; i < px.length; i += 4) {
-                var isInk = needsInvert ? (px[i] > otsuThresh) : (px[i] < otsuThresh);
-                px[i] = px[i + 1] = px[i + 2] = isInk ? 0 : 255;
-            }
-            srcCtx.putImageData(imgData, 0, 0);
-
-            // 5e: Dilatación morfológica leve (engrosa trazos finos de 1px)
-            // Esto ayuda a TrOCR a detectar letras con trazos muy finos
-            progress.innerText = 'Mejorando trazos...';
-            var dilated = srcCtx.getImageData(0, 0, w, h);
-            var d = dilated.data;
-            var src = srcCtx.getImageData(0, 0, w, h).data;
-            for (var y = 1; y < h - 1; y++) {
-                for (var x = 1; x < w - 1; x++) {
-                    var idx = (y * w + x) * 4;
-                    // Si el píxel actual ES tinta, dejar como está
-                    // Si NO es tinta, verificar si algún vecino SÍ lo es → hacer tinta
-                    if (src[idx] === 255) { // es fondo blanco
-                        if (src[((y-1)*w+x)*4] === 0 || src[((y+1)*w+x)*4] === 0 ||
-                            src[(y*w+x-1)*4] === 0 || src[(y*w+x+1)*4] === 0) {
-                            d[idx] = d[idx+1] = d[idx+2] = 0; // convertir a tinta
-                        }
-                    }
-                }
-            }
-            srcCtx.putImageData(dilated, 0, 0);
-
-            // Paso 6: Detectar líneas de texto — barrido horizontal con umbral sensible para manuscrito
-            progress.innerText = 'Detectando líneas de texto...';
-            var binData = srcCtx.getImageData(0, 0, w, h).data;
-            var rowInk = new Array(h);
-            for (var y = 0; y < h; y++) {
-                var ink = 0;
-                for (var x = 0; x < w; x++) {
-                    // Solo contar píxeles que son tinta (valor 0)
-                    if (binData[(y * w + x) * 4] === 0) ink++;
-                }
-                rowInk[y] = ink;
-            }
-
-            // Calcular percentil 75 de tinta por fila para un umbral más robusto
-            var sortedInk = rowInk.slice().sort(function(a, b) { return a - b; });
-            var p75 = sortedInk[Math.floor(h * 0.75)] || 0;
-            var avgInk = rowInk.reduce(function(a, b) { return a + b; }, 0) / h;
-            // Umbral bajo: 4% del promedio o 3% del p75 — sensible a trazos finos manuscritos
-            var inkThresh = Math.max(avgInk * 0.04, p75 * 0.03, 5);
-            console.log('[TrOCR] Estadísticas de tinta — Promedio:', avgInk.toFixed(1), 'P75:', p75, 'Umbral:', inkThresh.toFixed(1));
-
-            var rawLines = [];
-            var inLine = false, lineStart = 0;
-            for (var y = 0; y < h; y++) {
-                if (rowInk[y] > inkThresh && !inLine) {
-                    inLine = true;
-                    lineStart = y;
-                } else if ((rowInk[y] <= inkThresh || y === h - 1) && inLine) {
-                    inLine = false;
-                    rawLines.push({ s: lineStart, e: y === h - 1 && rowInk[y] > inkThresh ? h : y });
-                }
-            }
-            console.log('[TrOCR] Líneas crudas detectadas:', rawLines.length);
-
-            // Fusionar líneas muy cercanas (gap < 14px para manuscrito con trazos descendentes)
-            var MERGE_GAP = 14;
-            var lines = [];
-            for (var i = 0; i < rawLines.length; i++) {
-                if (lines.length > 0 && rawLines[i].s - lines[lines.length - 1].e < MERGE_GAP) {
-                    lines[lines.length - 1].e = rawLines[i].e;
-                } else {
-                    lines.push({ s: rawLines[i].s, e: rawLines[i].e });
-                }
-            }
-
-            // Filtrar líneas demasiado pequeñas (ruido < 6px)
-            lines = lines.filter(function(l) { return (l.e - l.s) >= 6; });
-            console.log('[TrOCR] Líneas después de fusionar y filtrar:', lines.length, JSON.stringify(lines));
-
-            // --- FUNCIÓN HELPER: Recortar espacio blanco horizontal de una franja ---
-            function trimLineH(canvas, lineY, lineH) {
-                var ctx = canvas.getContext('2d');
-                var stripData = ctx.getImageData(0, lineY, canvas.width, lineH).data;
-                var left = canvas.width, right = 0;
-                for (var yy = 0; yy < lineH; yy++) {
-                    for (var xx = 0; xx < canvas.width; xx++) {
-                        if (stripData[(yy * canvas.width + xx) * 4] === 0) {
-                            if (xx < left) left = xx;
-                            if (xx > right) right = xx;
-                        }
-                    }
-                }
-                // Agregar márgenes horizontales
-                var margin = 8;
-                left = Math.max(0, left - margin);
-                right = Math.min(canvas.width - 1, right + margin);
-                if (left >= right) left = 0; right = canvas.width; // seguridad
-                return { left: left, right: right };
-            }
-
-            // Paso 7: Procesar CADA línea por separado con TrOCR
-            var recognizedLines = [];
-            var totalLines = lines.length;
-
-            if (totalLines === 0) {
-                console.log('[TrOCR] No se detectaron líneas → intentando imagen completa...');
-                progress.innerText = 'Reconociendo texto completo...';
-                var fullResult = await trocrPipeline(srcCanvas.toDataURL('image/png'));
-                console.log('[TrOCR] Resultado imagen completa:', JSON.stringify(fullResult));
-                var fullTexts = (fullResult || []).map(function(r) { return (r.generated_text || '').trim(); }).filter(function(t) { return t.length > 1; });
-                recognizedLines = fullTexts;
-            } else {
-                for (var i = 0; i < totalLines; i++) {
-                    progress.innerText = 'Reconociendo línea ' + (i + 1) + ' de ' + totalLines + '...';
-                    var pad = 10; // padding vertical generoso para manuscrito
-
-                    // Obtener bounds de la línea con padding
-                    var ly = Math.max(0, lines[i].s - pad);
-                    var lh = Math.min(h, lines[i].e + pad) - ly;
-
-                    // Recortar espacio blanco horizontal
-                    var hBounds = trimLineH(srcCanvas, lines[i].s, lines[i].e - lines[i].s);
-                    var lx = hBounds.left;
-                    var lw = hBounds.right - hBounds.left + 1;
-
-                    var lineCanvas = document.createElement('canvas');
-                    lineCanvas.width = lw;
-                    lineCanvas.height = lh;
-                    var lineCtx = lineCanvas.getContext('2d');
-                    // Rellenar con blanco
-                    lineCtx.fillStyle = '#FFFFFF';
-                    lineCtx.fillRect(0, 0, lw, lh);
-                    // Copiar la franja recortada
-                    lineCtx.drawImage(srcCanvas, lx, ly, lw, lh, 0, 0, lw, lh);
-
-                    var lineDataUrl = lineCanvas.toDataURL('image/png');
-                    var lineH = lines[i].e - lines[i].s;
-                    console.log('[TrOCR] Línea', (i+1), '- Y:', lines[i].s, '-', lines[i].e, 'H:', lineH, 'Recorte H:', lx, '-', hBounds.right, 'Ancho:', lw);
-
-                    try {
-                        var lineResult = await trocrPipeline(lineDataUrl);
-                        console.log('[TrOCR] Resultado línea', (i+1), ':', JSON.stringify(lineResult));
-                        var texts = (lineResult || []).map(function(r) { return (r.generated_text || '').trim(); }).filter(function(t) { return t.length > 1; });
-                        if (texts.length > 0) {
-                            recognizedLines = recognizedLines.concat(texts);
-                        }
-                    } catch (lineErr) {
-                        console.warn('[TrOCR] Error en línea ' + (i + 1) + ':', lineErr);
-                    }
-                }
-            }
-
-            console.log('[TrOCR] Total líneas reconocidas:', recognizedLines.length, '→', JSON.stringify(recognizedLines));
-
-            // Paso 8: Si TrOCR no produjo texto significativo, intentar con Tesseract como fallback
-            if (recognizedLines.length === 0 || recognizedLines.join('').replace(/\s/g, '').length < 10) {
-                console.log('[TrOCR] Texto insuficiente (' + recognizedLines.join('').length + ' chars) → activando fallback a Tesseract...');
-                progress.innerText = 'TrOCR no reconoció bien. Intentando con Tesseract...';
-                loading.classList.add('hidden');
-
-                // Reutilizar la imagen original (preprocesada) como archivo para Tesseract
-                srcCanvas.toBlob(function(blob) {
-                    var fallbackFile = new File([blob], 'receta_fallback.png', { type: 'image/png' });
-                    processRecipePhotoTesseract(fallbackFile);
-                }, 'image/png');
-                return;
-            }
-
-            // Paso 9: Estructurar la receta (reutiliza la misma función que Tesseract)
-            var fullText = recognizedLines.join('\n');
-            var parsed = parseOcrTextToRecipeStructure(fullText);
-            parsed.channel = 'Recetario de Mamá (TrOCR IA local)';
-
-            loading.classList.add('hidden');
-
-            // Inyectar resultado en el formulario (misma estructura que Gemini y Tesseract)
-            document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
-            document.getElementById('editRecipeId').value = '';
-            document.getElementById('formTitle').value = parsed.title;
-            document.getElementById('formCategory').value = parsed.category;
-            document.getElementById('formChannel').value = parsed.channel;
-            document.getElementById('formInstagramUrl').value = '';
-            document.getElementById('formImageUrl').value = '';
-            document.getElementById('formIngredients').value = normalizeNewlineString(parsed.ingredients);
-            document.getElementById('formInstructions').value = normalizeNewlineString(parsed.instructions);
-
-            document.getElementById('recipeModal').classList.remove('hidden');
-            showToast('🧠 Receta reconocida con IA local (TrOCR). Revisa y ajusta los campos.');
-
-        } catch (e) {
-            console.error('[TrOCR] Error:', e);
-            loading.classList.add('hidden');
-            var msg = 'No se pudo procesar la foto con TrOCR. ';
-            if (e.message) {
-                if (e.message.indexOf('fetch') !== -1 || e.message.indexOf('network') !== -1 || e.message.indexOf('Failed') !== -1) {
-                    msg += 'Error de conexión. Se necesita internet para descargar el modelo la primera vez.';
-                } else {
-                    msg += e.message;
-                }
-            }
-            showToast(msg, 'error');
-        }
-    }
-
     Object.assign(window, {
         selectRecipe, toggleFavoriteInline, toggleFavoriteActive,
         setCategoryFilter, filterRecipes,
@@ -3252,10 +2817,13 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         openChefChat, closeChefChat, sendChefChatMessage,
         analyzeNutritionAI, closeNutritionModal,
         openAdaptRecipe, closeAdaptRecipe, selectAdaptPreset, processAdaptRecipeAI, saveAdaptedAsNewRecipe,
-        triggerRecipePhotoCapture, processRecipePhoto, processRecipePhotoTrOCR,
+        triggerRecipePhotoCapture, processRecipePhoto,
         openScanOptionsMenu, closeScanOptionsMenu, selectScanMethod,
         cancelCrop, confirmCrop, skipCrop, cropRotate, cropZoom, cropFlipH
     });
 </script>
+
+<!-- Botón flotante para abrir la consola de depuración móvil (Eruda) -->
+<button onclick="__toggleDebugConsole()" style="position:fixed; bottom:14px; left:14px; z-index:9999; width:40px; height:40px; border-radius:50%; background:#1e293b; color:#fff; border:none; font-size:18px; box-shadow:0 2px 8px rgba(0,0,0,0.3); opacity:0.55;">🐞</button>
 </body>
 </html>
