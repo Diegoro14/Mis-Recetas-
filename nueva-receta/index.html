@@ -21,7 +21,93 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-    <!-- Transformers.js (TrOCR): se carga vía dynamic import() dentro de processRecipePhotoTrOCR -->
+    <!-- Transformers.js (TrOCR): módulo que importa la librería y expone funciones al scope global -->
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+
+        env.allowLocalModels = false;
+        env.useBrowserCache = true;
+
+        let _pipelineInst = null;
+        let _pipelineLoading = false;
+
+        window.__trOCR_createPipeline = async function(progressCb) {
+            if (_pipelineInst) return _pipelineInst;
+            if (_pipelineLoading) {
+                while (_pipelineLoading) await new Promise(function(r) { setTimeout(r, 500); });
+                return _pipelineInst;
+            }
+            _pipelineLoading = true;
+            try {
+                _pipelineInst = await pipeline('image-to-text', 'Xenova/trocr-base-handwritten', {
+                    progress_callback: progressCb || function() {}
+                });
+            } finally {
+                _pipelineLoading = false;
+            }
+            return _pipelineInst;
+        };
+
+        window.__trOCR_run = async function(img, pl) {
+            return await pl(img, { max_new_tokens: 512 });
+        };
+
+        window.__trOCRModuleReady = true;
+        console.log('[TrOCR] Módulo Transformers.js cargado correctamente.');
+    </script>
+
+    <!-- Fallback: si el primer módulo falló (import incompatible), intentar con esm.sh -->
+    <script type="module">
+        if (!window.__trOCRModuleReady) {
+            console.log('[TrOCR] CDN principal falló, intentando esm.sh...');
+            try {
+                const mod = await import('https://esm.sh/@xenova/transformers@2.17.2');
+                const { pipeline, env } = mod;
+                env.allowLocalModels = false;
+                env.useBrowserCache = true;
+
+                let _pipelineInst = null;
+                let _pipelineLoading = false;
+
+                window.__trOCR_createPipeline = async function(progressCb) {
+                    if (_pipelineInst) return _pipelineInst;
+                    if (_pipelineLoading) {
+                        while (_pipelineLoading) await new Promise(function(r) { setTimeout(r, 500); });
+                        return _pipelineInst;
+                    }
+                    _pipelineLoading = true;
+                    try {
+                        _pipelineInst = await pipeline('image-to-text', 'Xenova/trocr-base-handwritten', {
+                            progress_callback: progressCb || function() {}
+                        });
+                    } finally {
+                        _pipelineLoading = false;
+                    }
+                    return _pipelineInst;
+                };
+
+                window.__trOCR_run = async function(img, pl) {
+                    return await pl(img, { max_new_tokens: 512 });
+                };
+
+                window.__trOCRModuleReady = true;
+                console.log('[TrOCR] Módulo cargado vía esm.sh correctamente.');
+            } catch (e2) {
+                console.error('[TrOCR] Todos los CDNs fallaron:', e2);
+                window.__trOCRModuleError = 'No se pudo cargar Transformers.js desde ningún CDN. Verifica tu conexión a internet.';
+            }
+        }
+    </script>
+
+    <!-- Timer de seguridad: si después de 20s el módulo no cargó, marca el error -->
+    <script>
+        setTimeout(function() {
+            if (!window.__trOCRModuleReady && !window.__trOCRModuleError) {
+                console.warn('[TrOCR] El módulo no se cargó después de 20 segundos.');
+                window.__trOCRModuleError = 'Transformers.js no se pudo cargar. Puede que tu navegador no soporte módulos ES o haya un problema de red. Intenta recargar la página.';
+            }
+        }, 20000);
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
     <script>
@@ -2694,77 +2780,62 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
     }
 
     // --- Motor 3: Escaneo IA Local con TrOCR vía Transformers.js (manuscrito/cursiva) ---
-    // Caché del pipeline para no descargar el modelo en cada uso
-    let _trocrPipeline = null;
-    let _trocrLoading = false;
 
     async function processRecipePhotoTrOCR(file) {
         const loading = document.getElementById('loadingModal');
         const progress = document.getElementById('loadingProgressText');
         loading.classList.remove('hidden');
-        progress.innerText = 'Preparando modelo TrOCR (IA manuscrita)...';
 
         try {
-            // Dynamic import de Transformers.js (se carga solo cuando se necesita)
-            let pipeline;
-            try {
-                const transformersModule = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
-                pipeline = transformersModule.pipeline;
-            } catch (importErr) {
-                throw new Error('No se pudo cargar Transformers.js. Verifica tu conexión a internet para la primera descarga.');
-            }
-
-            if (!pipeline) {
-                throw new Error('Transformers.js no exportó la función pipeline.');
-            }
-
-            // Crear o reutilizar el pipeline (el modelo se cachea en el navegador)
-            if (!_trocrPipeline && !_trocrLoading) {
-                _trocrLoading = true;
-                progress.innerText = 'Descargando modelo TrOCR por primera vez (~300 MB)...';
-                try {
-                    _trocrPipeline = await pipeline(
-                        'image-to-text',
-                        'Xenova/trocr-base-handwritten',
-                        {
-                            progress_callback: function(p) {
-                                if (p.status === 'download' && p.file && typeof p.progress === 'number') {
-                                    const pct = Math.round(p.progress * 100);
-                                    const fileName = p.file.split('/').pop();
-                                    progress.innerText = 'Descargando modelo: ' + fileName + ' ' + pct + '%';
-                                } else if (p.status === 'progress' && typeof p.progress === 'number') {
-                                    const pct = Math.round(p.progress * 100);
-                                    progress.innerText = 'Cargando modelo TrOCR... ' + pct + '%';
-                                } else if (p.status === 'ready') {
-                                    progress.innerText = 'Modelo listo. Procesando imagen...';
-                                } else if (p.status) {
-                                    progress.innerText = p.status.charAt(0).toUpperCase() + p.status.slice(1) + '...';
-                                }
-                            }
+            // Paso 1: Esperar a que el módulo de Transformers.js esté disponible
+            if (!window.__trOCRModuleReady) {
+                progress.innerText = 'Cargando motor de IA manuscrita (primera vez puede tardar)...';
+                await new Promise(function(resolve, reject) {
+                    var timeout = setTimeout(function() {
+                        reject(new Error('La librería Transformers.js tardó demasiado en cargar. Recarga la página e inténtalo de nuevo.'));
+                    }, 25000);
+                    var interval = setInterval(function() {
+                        if (window.__trOCRModuleReady) {
+                            clearTimeout(timeout);
+                            clearInterval(interval);
+                            resolve();
                         }
-                    );
-                } finally {
-                    _trocrLoading = false;
-                }
-            } else if (_trocrLoading) {
-                // Esperar a que termine la carga si otro llamado lo inició
-                progress.innerText = 'Modelo ya descargándose, espera un momento...';
-                while (_trocrLoading) {
-                    await new Promise(function(r) { setTimeout(r, 500); });
-                }
+                        if (window.__trOCRModuleError) {
+                            clearTimeout(timeout);
+                            clearInterval(interval);
+                            reject(new Error(window.__trOCRModuleError));
+                        }
+                    }, 400);
+                });
             }
 
-            if (!_trocrPipeline) {
+            // Paso 2: Crear o reutilizar el pipeline (descarga modelo solo la primera vez)
+            progress.innerText = 'Inicializando modelo TrOCR...';
+            var trocrPipeline = await window.__trOCR_createPipeline(function(p) {
+                if (p.status === 'download' && p.file) {
+                    var pct = typeof p.progress === 'number' ? Math.round(p.progress * 100) : '';
+                    var nombre = p.file.split('/').pop();
+                    progress.innerText = 'Descargando modelo: ' + nombre + (pct ? ' ' + pct + '%' : '');
+                } else if (p.status === 'progress' && typeof p.progress === 'number') {
+                    progress.innerText = 'Cargando modelo TrOCR... ' + Math.round(p.progress * 100) + '%';
+                } else if (p.status === 'ready') {
+                    progress.innerText = 'Modelo listo. Procesando imagen...';
+                } else if (p.status) {
+                    progress.innerText = p.status.charAt(0).toUpperCase() + p.status.slice(1) + '...';
+                }
+            });
+
+            if (!trocrPipeline) {
                 throw new Error('No se pudo inicializar el modelo TrOCR.');
             }
 
-            // Preprocesar la imagen: redimensionar si es muy grande para mejorar velocidad
+            // Paso 3: Preprocesar la imagen (redimensionar si es muy grande)
             progress.innerText = 'Procesando imagen con TrOCR...';
-            const imageBitmap = await createImageBitmap(file);
-            const MAX_DIM = 1280;
-            let processedBitmap = imageBitmap;
+            var imageBitmap = await createImageBitmap(file);
+            var MAX_DIM = 1280;
+            var processedBitmap = imageBitmap;
             if (imageBitmap.width > MAX_DIM || imageBitmap.height > MAX_DIM) {
-                const scale = MAX_DIM / Math.max(imageBitmap.width, imageBitmap.height);
+                var scale = MAX_DIM / Math.max(imageBitmap.width, imageBitmap.height);
                 processedBitmap = await createImageBitmap(
                     imageBitmap,
                     { resizeWidth: Math.round(imageBitmap.width * scale), resizeHeight: Math.round(imageBitmap.height * scale) }
@@ -2772,13 +2843,13 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
                 imageBitmap.close();
             }
 
-            // Ejecutar reconocimiento de texto con TrOCR
+            // Paso 4: Ejecutar reconocimiento de texto
             progress.innerText = 'Reconociendo letra manuscrita con IA...';
-            const results = await _trocrPipeline(processedBitmap, { max_new_tokens: 512 });
+            var results = await window.__trOCR_run(processedBitmap, trocrPipeline);
             processedBitmap.close();
 
-            // TrOCR devuelve un array de objetos con la propiedad 'generated_text'
-            const recognizedLines = results
+            // Paso 5: Extraer líneas reconocidas
+            var recognizedLines = (results || [])
                 .map(function(r) { return (r.generated_text || '').trim(); })
                 .filter(function(t) { return t.length > 0; });
 
@@ -2786,20 +2857,16 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
                 throw new Error('TrOCR no detectó texto en la imagen. Asegúrate de que la foto tenga buena luz y el texto sea legible.');
             }
 
-            // Unir todas las líneas reconocidas
-            const fullText = recognizedLines.join('\n');
-
-            // Usar la misma función de parseo que Tesseract para estructurar la receta
-            const parsed = parseOcrTextToRecipeStructure(fullText);
-            // Sobrescribir el channel para distinguir el motor usado
+            // Paso 6: Estructurar la receta (reutiliza la misma función que Tesseract)
+            var fullText = recognizedLines.join('\n');
+            var parsed = parseOcrTextToRecipeStructure(fullText);
             parsed.channel = 'Recetario de Mamá (TrOCR IA local)';
 
             loading.classList.add('hidden');
 
-            // Inyectar resultado en el formulario usando la misma estructura que Gemini y Tesseract
+            // Inyectar resultado en el formulario (misma estructura que Gemini y Tesseract)
             document.getElementById('recipeModalTitle').innerText = 'Crear Receta';
             document.getElementById('editRecipeId').value = '';
-
             document.getElementById('formTitle').value = parsed.title;
             document.getElementById('formCategory').value = parsed.category;
             document.getElementById('formChannel').value = parsed.channel;
@@ -2812,13 +2879,15 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
             showToast('🧠 Receta reconocida con IA local (TrOCR). Revisa y ajusta los campos.');
 
         } catch (e) {
-            console.error('Error en TrOCR:', e);
+            console.error('[TrOCR] Error:', e);
             loading.classList.add('hidden');
-            let msg = 'No se pudo procesar la foto con TrOCR. ';
-            if (e.message && e.message.includes('Failed to fetch')) {
-                msg += 'Se necesita conexión a internet para descargar el modelo la primera vez.';
-            } else if (e.message) {
-                msg += e.message;
+            var msg = 'No se pudo procesar la foto con TrOCR. ';
+            if (e.message) {
+                if (e.message.indexOf('fetch') !== -1 || e.message.indexOf('network') !== -1 || e.message.indexOf('Failed') !== -1) {
+                    msg += 'Error de conexión. Se necesita internet para descargar el modelo la primera vez.';
+                } else {
+                    msg += e.message;
+                }
             }
             showToast(msg, 'error');
         }
