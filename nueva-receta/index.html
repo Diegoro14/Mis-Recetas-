@@ -2829,24 +2829,38 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
                 throw new Error('No se pudo inicializar el modelo TrOCR.');
             }
 
-            // Paso 3: Preprocesar la imagen (redimensionar si es muy grande)
-            progress.innerText = 'Procesando imagen con TrOCR...';
-            var imageBitmap = await createImageBitmap(file);
+            // Paso 3: Cargar imagen en un HTMLImageElement (compatible con todos los navegadores)
+            progress.innerText = 'Preparando imagen...';
+            var imageElement = await new Promise(function(resolve, reject) {
+                var img = new Image();
+                var blobUrl = URL.createObjectURL(file);
+                img.onload = function() { URL.revokeObjectURL(blobUrl); resolve(img); };
+                img.onerror = function() { URL.revokeObjectURL(blobUrl); reject(new Error('No se pudo cargar la imagen seleccionada.')); };
+                img.src = blobUrl;
+            });
+
+            // Paso 4: Redimensionar con Canvas y convertir a data URL (string es el tipo
+            // más compatible con Transformers.js en todos los navegadores y contextos)
+            progress.innerText = 'Reconociendo letra manuscrita con IA...';
             var MAX_DIM = 1280;
-            var processedBitmap = imageBitmap;
-            if (imageBitmap.width > MAX_DIM || imageBitmap.height > MAX_DIM) {
-                var scale = MAX_DIM / Math.max(imageBitmap.width, imageBitmap.height);
-                processedBitmap = await createImageBitmap(
-                    imageBitmap,
-                    { resizeWidth: Math.round(imageBitmap.width * scale), resizeHeight: Math.round(imageBitmap.height * scale) }
-                );
-                imageBitmap.close();
+            var w = imageElement.naturalWidth || imageElement.width;
+            var h = imageElement.naturalHeight || imageElement.height;
+
+            if (w > MAX_DIM || h > MAX_DIM) {
+                var scale = MAX_DIM / Math.max(w, h);
+                w = Math.round(w * scale);
+                h = Math.round(h * scale);
             }
 
-            // Paso 4: Ejecutar reconocimiento de texto
-            progress.innerText = 'Reconociendo letra manuscrita con IA...';
-            var results = await window.__trOCR_run(processedBitmap, trocrPipeline);
-            processedBitmap.close();
+            var canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(imageElement, 0, 0, w, h);
+            var imageDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+            // Paso 5: Ejecutar reconocimiento pasando un string (data URL), que
+            // Transformers.js siempre reconoce sin importar navegador o contexto
+            var results = await trocrPipeline(imageDataUrl);
 
             // Paso 5: Extraer líneas reconocidas
             var recognizedLines = (results || [])
