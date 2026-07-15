@@ -41,9 +41,16 @@
             }
             _pipelineLoading = true;
             try {
-                _pipelineInst = await pipeline('image-to-text', 'Xenova/trocr-base-handwritten', {
+                var pipelinePromise = pipeline('image-to-text', 'Xenova/trocr-base-handwritten', {
+                    quantized: true,
                     progress_callback: progressCb || function() {}
                 });
+                var timeoutPromise = new Promise(function(_, reject) {
+                    setTimeout(function() {
+                        reject(new Error('La descarga/inicialización del modelo TrOCR superó los 4 minutos. En el iPhone puede ser lento (menos memoria y sin hilos WASM); probá con Wi-Fi, cerrá otras apps/pestañas, y si sigue fallando usá Gemini para manuscrito.'));
+                    }, 240000);
+                });
+                _pipelineInst = await Promise.race([pipelinePromise, timeoutPromise]);
             } finally {
                 _pipelineLoading = false;
             }
@@ -79,9 +86,16 @@
                     }
                     _pipelineLoading = true;
                     try {
-                        _pipelineInst = await pipeline('image-to-text', 'Xenova/trocr-base-handwritten', {
+                        var pipelinePromise = pipeline('image-to-text', 'Xenova/trocr-base-handwritten', {
+                            quantized: true,
                             progress_callback: progressCb || function() {}
                         });
+                        var timeoutPromise = new Promise(function(_, reject) {
+                            setTimeout(function() {
+                                reject(new Error('La descarga/inicialización del modelo TrOCR superó los 4 minutos. En el iPhone puede ser lento (menos memoria y sin hilos WASM); probá con Wi-Fi, cerrá otras apps/pestañas, y si sigue fallando usá Gemini para manuscrito.'));
+                            }, 240000);
+                        });
+                        _pipelineInst = await Promise.race([pipelinePromise, timeoutPromise]);
                     } finally {
                         _pipelineLoading = false;
                     }
@@ -109,6 +123,23 @@
                 window.__trOCRModuleError = 'Transformers.js no se pudo cargar. Puede que tu navegador no soporte módulos ES o haya un problema de red. Intenta recargar la página.';
             }
         }, 20000);
+    </script>
+
+    <!-- === CONSOLA DE DEPURACIÓN MÓVIL (Eruda) ===
+         Botón flotante "🐞" que abre un panel de consola/logs directo en el iPhone,
+         sin necesitar una Mac con Web Inspector. Solo carga la librería si tocás el botón. -->
+    <script>
+        window.__toggleDebugConsole = function() {
+            if (window.eruda) {
+                if (window.__erudaVisible) { eruda.hide(); window.__erudaVisible = false; }
+                else { eruda.show(); window.__erudaVisible = true; }
+                return;
+            }
+            var s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/eruda@3.0.1/eruda.min.js';
+            s.onload = function() { eruda.init(); eruda.show(); window.__erudaVisible = true; };
+            document.body.appendChild(s);
+        };
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
@@ -912,12 +943,12 @@
             </div>
             <div>
                 <label class="block text-[0.75rem] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">Ingredientes (uno por línea)</label>
-                <textarea id="formIngredients" placeholder="2 tazas de avena&#10;2 huevos&#10;1 plátano" rows="4"
+                <textarea id="formIngredients" placeholder="" rows="4"
                     class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs focus:ring-0 glass-input text-slate-900 dark:text-white font-mono forced-light-input"></textarea>
             </div>
             <div>
                 <label class="block text-[0.75rem] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">Preparación (un paso por línea)</label>
-                <textarea id="formInstructions" placeholder="Mezclar todos los ingredientes de la masa.&#10;Cocinar a la plancha..." rows="4"
+                <textarea id="formInstructions" placeholder="" rows="4"
                     class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs focus:ring-0 glass-input text-slate-900 dark:text-white font-mono forced-light-input"></textarea>
             </div>
             <button onclick="saveRecipe(event)" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs shadow-lg animate-pulse" style="min-height:48px">
@@ -3243,5 +3274,8 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         cancelCrop, confirmCrop, skipCrop, cropRotate, cropZoom, cropFlipH
     });
 </script>
+
+<!-- Botón flotante para abrir la consola de depuración móvil (Eruda) -->
+<button onclick="__toggleDebugConsole()" style="position:fixed; bottom:14px; left:14px; z-index:9999; width:40px; height:40px; border-radius:50%; background:#1e293b; color:#fff; border:none; font-size:18px; box-shadow:0 2px 8px rgba(0,0,0,0.3); opacity:0.55;">🐞</button>
 </body>
 </html>
