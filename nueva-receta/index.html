@@ -750,6 +750,17 @@
                 <label class="text-[0.75rem] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Descripción del video (opcional, recomendado en Instagram):</label>
                 <textarea id="importDescriptionInput" placeholder="Pega aquí la descripción/caption del video. Instagram no permite traerla automáticamente, así que si la pegas aquí, Gemini buscará los ingredientes en ese texto." rows="5"
                     class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 text-xs focus:outline-none focus:ring-0 glass-input text-slate-900 dark:text-white forced-light-input"></textarea>
+                <label for="importScreenshotInput" class="mt-1.5 inline-flex items-center gap-1.5 text-[0.75rem] font-bold text-blue-600 dark:text-blue-400 cursor-pointer">
+                    <i class="fa-solid fa-camera"></i> o adjunta una captura de pantalla con los ingredientes
+                </label>
+                <input type="file" id="importScreenshotInput" accept="image/*" class="hidden" onchange="setImportScreenshot(event)">
+                <div id="importScreenshotPreviewWrap" class="hidden mt-1.5 relative inline-block">
+                    <img id="importScreenshotPreview" src="" class="rounded-xl border border-slate-200 dark:border-slate-700 object-cover block" style="max-height:90px;max-width:100%">
+                    <button type="button" onclick="clearImportScreenshot()" class="absolute -top-2 -right-2 bg-slate-900 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-lg" title="Quitar captura">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <p class="text-[0.7rem] text-slate-400 dark:text-slate-500">La captura solo se usa para leer los ingredientes; no queda guardada como foto de la receta.</p>
             </div>
             <button onclick="processPastedDescriptionWithAI()" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3.5 px-4 rounded-xl font-extrabold flex items-center justify-center gap-2 text-sm shadow-md" style="min-height:48px">
                 <i class="fa-solid fa-brain"></i> Analizar con Gemini IA
@@ -839,7 +850,13 @@
                 </div>
             </div>
             <div>
-                <label class="block text-[0.75rem] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">Ingredientes (uno por línea)</label>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-[0.75rem] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Ingredientes (uno por línea)</label>
+                    <label for="ingredientsScreenshotInput" class="inline-flex items-center gap-1 text-[0.7rem] font-bold text-blue-600 dark:text-blue-400 cursor-pointer">
+                        <i class="fa-solid fa-camera"></i> Extraer de una captura
+                    </label>
+                    <input type="file" id="ingredientsScreenshotInput" accept="image/*" class="hidden" onchange="extractIngredientsFromScreenshot(event)">
+                </div>
                 <textarea id="formIngredients" placeholder="" rows="4"
                     class="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs focus:ring-0 glass-input text-slate-900 dark:text-white font-mono forced-light-input"></textarea>
             </div>
@@ -1527,9 +1544,73 @@
         document.getElementById('importLinkInput').value = '';
         document.getElementById('importImageUrlInput').value = '';
         document.getElementById('importDescriptionInput').value = '';
+        clearImportScreenshot();
         document.getElementById('importModal').classList.remove('hidden');
     }
     function closeImportModal() { document.getElementById('importModal').classList.add('hidden'); }
+
+    // === CAPTURA DE PANTALLA PARA EXTRAER INGREDIENTES EN EL IMPORTADOR (no se guarda como foto) ===
+    let _importScreenshotFile = null;
+
+    function setImportScreenshot(event) {
+        const file = event.target.files && event.target.files[0];
+        event.target.value = '';
+        if (!file) return;
+        _importScreenshotFile = file;
+        const wrap = document.getElementById('importScreenshotPreviewWrap');
+        const img = document.getElementById('importScreenshotPreview');
+        img.src = URL.createObjectURL(file);
+        wrap.classList.remove('hidden');
+    }
+
+    function clearImportScreenshot() {
+        _importScreenshotFile = null;
+        const wrap = document.getElementById('importScreenshotPreviewWrap');
+        const img = document.getElementById('importScreenshotPreview');
+        if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+        img.src = '';
+        wrap.classList.add('hidden');
+    }
+
+    // Extrae solo ingredientes (y pasos si aparecen) de una captura de pantalla vía Gemini Vision.
+    // Se usa tanto desde el importador de links como desde el formulario de receta; nunca setea imageUrl.
+    async function extractIngredientsAndInstructionsFromImage(file) {
+        const base64Data = await fileToBase64(file);
+        const mimeType = file.type || 'image/jpeg';
+
+        const sysPrompt = `Eres un experto extrayendo recetas de capturas de pantalla (por ejemplo posts o stories de Instagram, TikTok, sitios web de cocina, etc).
+Lee la imagen y extrae ÚNICAMENTE lo que aparece de forma literal. NUNCA inventes ingredientes, cantidades o pasos que no estén en la imagen.
+Devuelve SOLAMENTE un objeto JSON válido, sin bloques de markdown ni texto adicional.
+Estructura JSON exacta:
+{
+  "ingredients": "Lista de ingredientes tal como aparecen, uno por línea, separados estrictamente por saltos de línea (\\n). Si no hay ingredientes visibles, devuelve un string vacío.",
+  "instructions": "Pasos de preparación si están visibles en la imagen, uno por línea, separados estrictamente por saltos de línea (\\n). Si no hay pasos visibles, devuelve un string vacío."
+}`;
+
+        const payload = {
+            contents: [{
+                parts: [
+                    { text: 'Extrae los ingredientes (y los pasos de preparación si aparecen) de esta captura de pantalla de una receta.' },
+                    { inlineData: { mimeType: mimeType, data: base64Data } }
+                ]
+            }],
+            systemInstruction: { parts: [{ text: sysPrompt }] },
+            generationConfig: { responseMimeType: "application/json" }
+        };
+
+        const rawResponse = await callGeminiAPI(payload);
+        let parsed;
+        try {
+            parsed = JSON.parse(rawResponse.trim());
+        } catch (jsonErr) {
+            const clean = rawResponse.match(/\{[\s\S]*\}/);
+            parsed = clean ? JSON.parse(clean[0]) : null;
+        }
+        return {
+            ingredients: normalizeNewlineString(parsed?.ingredients || ''),
+            instructions: normalizeNewlineString(parsed?.instructions || '')
+        };
+    }
 
     async function triggerCloudPush() {
         const key = document.getElementById('syncCodeInput').value.trim().toUpperCase();
@@ -1593,6 +1674,61 @@
         document.getElementById('recipeModal').classList.remove('hidden');
     }
     function closeRecipeModal() { document.getElementById('recipeModal').classList.add('hidden'); }
+
+    // === EXTRAER INGREDIENTES DESDE UNA CAPTURA DE PANTALLA (Gemini Vision) ===
+    // Solo rellena los campos de Ingredientes/Preparación con lo que detecta en la imagen.
+    // NUNCA toca formImageUrl: la portada/banner de la receta se sigue definiendo por
+    // separado (URL manual, o miniatura de YouTube/Instagram/TikTok en el flujo de importar).
+    async function extractIngredientsFromScreenshot(event) {
+        const file = event.target.files && event.target.files[0];
+        event.target.value = '';
+        if (!file) return;
+
+        const apiKey = localStorage.getItem('gemini_api_key') || "";
+        if (!apiKey) {
+            showToast('Primero configura tu API Key de Gemini en Configuración ⚙️', 'error');
+            openConfigModal();
+            return;
+        }
+
+        const loading = document.getElementById('loadingModal');
+        const progress = document.getElementById('loadingProgressText');
+        loading.classList.remove('hidden');
+        progress.innerText = 'Leyendo ingredientes de la captura...';
+
+        try {
+            const { ingredients: extractedIngredients, instructions: extractedInstructions } =
+                await extractIngredientsAndInstructionsFromImage(file);
+
+            loading.classList.add('hidden');
+
+            if (!extractedIngredients && !extractedInstructions) {
+                showToast('No se detectaron ingredientes en la captura. Prueba con más luz o encuadre.', 'error');
+                return;
+            }
+
+            const ingredientsField = document.getElementById('formIngredients');
+            const instructionsField = document.getElementById('formInstructions');
+
+            // Si ya había texto escrito, agregamos debajo en vez de borrarlo.
+            if (extractedIngredients) {
+                ingredientsField.value = ingredientsField.value.trim()
+                    ? ingredientsField.value.trim() + '\n' + extractedIngredients
+                    : extractedIngredients;
+            }
+            if (extractedInstructions) {
+                instructionsField.value = instructionsField.value.trim()
+                    ? instructionsField.value.trim() + '\n' + extractedInstructions
+                    : extractedInstructions;
+            }
+
+            showToast('📸 Ingredientes extraídos de la captura');
+        } catch (e) {
+            console.error(e);
+            loading.classList.add('hidden');
+            showToast('No se pudo leer la captura. Prueba con más luz o revisa tu API Key.', 'error');
+        }
+    }
 
     function saveRecipe(e) {
         if (e) e.preventDefault();
@@ -1770,9 +1906,10 @@ Si no hay ingredientes identificables, responde exactamente: { "ingredients": ""
         const videoUrl = document.getElementById('importLinkInput').value.trim();
         const customImage = document.getElementById('importImageUrlInput').value.trim();
         const userDesc = document.getElementById('importDescriptionInput').value.trim();
+        const screenshotFile = _importScreenshotFile;
 
-        if (!videoUrl && !userDesc) {
-            showToast("Debes añadir al menos un Enlace o escribir una Descripción.", "error");
+        if (!videoUrl && !userDesc && !screenshotFile) {
+            showToast("Debes añadir al menos un Enlace, una Descripción o una captura.", "error");
             return;
         }
 
@@ -1824,6 +1961,26 @@ Si no hay ingredientes identificables, responde exactamente: { "ingredients": ""
                 extractedIngredients = await extractIngredientsFromCaptionAI(captionForIngredients);
             }
 
+            // Si se adjuntó una captura de pantalla, la leemos con Gemini Vision solo para
+            // sacar ingredientes/pasos de texto — la foto en sí NUNCA se guarda ni reemplaza
+            // la portada (esa sigue viniendo de la miniatura de YouTube/IG/TikTok o de la URL manual).
+            let extractedInstructionsFromImage = '';
+            if (screenshotFile) {
+                progress.innerText = 'Leyendo ingredientes de la captura...';
+                try {
+                    const fromImage = await extractIngredientsAndInstructionsFromImage(screenshotFile);
+                    if (fromImage.ingredients) {
+                        extractedIngredients = extractedIngredients
+                            ? extractedIngredients + '\n' + fromImage.ingredients
+                            : fromImage.ingredients;
+                    }
+                    extractedInstructionsFromImage = fromImage.instructions;
+                } catch (imgErr) {
+                    console.error('No se pudo leer la captura del importador:', imgErr);
+                }
+            }
+            clearImportScreenshot();
+
             closeImportModal();
             loading.classList.add('hidden');
 
@@ -1839,7 +1996,7 @@ Si no hay ingredientes identificables, responde exactamente: { "ingredients": ""
             // Si Gemini logró identificar ingredientes reales en la descripción, los dejamos ya cargados.
             // Si no, dejamos lo que el usuario haya escrito a mano (o vacío) para evitar inventar información.
             document.getElementById('formIngredients').value = extractedIngredients || userDesc || '';
-            document.getElementById('formInstructions').value = '';
+            document.getElementById('formInstructions').value = extractedInstructionsFromImage || '';
 
             document.getElementById('recipeModal').classList.remove('hidden');
 
@@ -2819,7 +2976,8 @@ Si alguna parte de la imagen no se alcanza a leer con claridad, transcribe lo qu
         openAdaptRecipe, closeAdaptRecipe, selectAdaptPreset, processAdaptRecipeAI, saveAdaptedAsNewRecipe,
         triggerRecipePhotoCapture, processRecipePhoto,
         openScanOptionsMenu, closeScanOptionsMenu, selectScanMethod,
-        cancelCrop, confirmCrop, skipCrop, cropRotate, cropZoom, cropFlipH
+        cancelCrop, confirmCrop, skipCrop, cropRotate, cropZoom, cropFlipH,
+        extractIngredientsFromScreenshot, setImportScreenshot, clearImportScreenshot
     });
 </script>
 
